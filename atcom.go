@@ -3,17 +3,15 @@ Created by: Yasin Kaya (selengalp), yasinkaya.121@gmail.com, 2023
 
 Copyright (c) 2023 Sixfab Inc.
 */
-package main
+package atcom
 
 import (
 	"bufio"
 	"context"
 	"errors"
-	"fmt"
 	"strings"
 	"time"
 
-	"github.com/sixfab/atcomv2/config"
 	"github.com/tarm/serial"
 )
 
@@ -40,7 +38,7 @@ func open(args map[string]interface{}) (port *serial.Port, err error) {
 	return serial.OpenPort(config)
 }
 
-func sendAT(command string, args map[string]interface{}) ([]string, error) {
+func SendAT(command string, args map[string]interface{}) ([]string, error) {
 
 	var lineEnd bool = true
 	var desired []string
@@ -58,20 +56,6 @@ func sendAT(command string, args map[string]interface{}) ([]string, error) {
 		case "lineEnd":
 			lineEnd = value.(bool)
 		}
-	}
-
-	if config.Verbose {
-		fmt.Println("")
-		fmt.Println("-------------------------------------------")
-		fmt.Println("Command: " + command)
-		fmt.Println("Port: " + args["port"].(string))
-		fmt.Println("Baud: " + fmt.Sprintf("%d", args["baud"].(int)))
-		fmt.Println("Desired: " + strings.Join(desired, ","))
-		fmt.Println("Fault: " + strings.Join(fault, ","))
-		fmt.Println("Timeout: " + fmt.Sprintf("%d", timeout))
-		fmt.Println("LineEnd: " + fmt.Sprintf("%t", lineEnd))
-		fmt.Println("-------------------------------------------")
-		fmt.Println("")
 	}
 
 	serialPort, err := open(args)
