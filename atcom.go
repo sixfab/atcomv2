@@ -100,7 +100,7 @@ func SendAT(command string, args map[string]interface{}) ([]string, error) {
 			}
 
 			if line == "OK" {
-
+				// make response string to check desired and fault
 				data := ""
 				for _, word := range response {
 					if word != "OK" {
@@ -108,18 +108,23 @@ func SendAT(command string, args map[string]interface{}) ([]string, error) {
 					}
 				}
 
-				for _, desiredStr := range desired {
-					if strings.Contains(data, desiredStr) {
-						found <- nil
-						return
+				// check desired and fault existed in response
+				if desired != nil || fault != nil {
+					for _, desiredStr := range desired {
+						if strings.Contains(data, desiredStr) {
+							found <- nil
+							return
+						}
 					}
-				}
 
-				for _, faultStr := range fault {
-					if strings.Contains(data, faultStr) {
-						found <- nil
-						return
+					for _, faultStr := range fault {
+						if strings.Contains(data, faultStr) {
+							found <- nil
+							return
+						}
 					}
+				} else {
+					return
 				}
 			} else if line == "ERROR" || strings.Contains(line, "+CME ERROR") {
 				found <- errors.New("modem error")
