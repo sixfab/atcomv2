@@ -1,4 +1,4 @@
-module github.com/sixfab/atcom
+module github.com/sixfab/atcomv2
 
 go 1.21.1
 
