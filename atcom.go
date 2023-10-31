@@ -41,9 +41,9 @@ func open(args map[string]interface{}) (port *serial.Port, err error) {
 func SendAT(command string, args map[string]interface{}) ([]string, error) {
 
 	var lineEnd bool = true
-	var desired []string
-	var fault []string
-	var timeout int
+	var desired []string = nil
+	var fault []string = nil
+	var timeout int = 5
 
 	for key, value := range args {
 		switch key {
@@ -124,6 +124,7 @@ func SendAT(command string, args map[string]interface{}) ([]string, error) {
 						}
 					}
 				} else {
+					found <- nil
 					return
 				}
 			} else if line == "ERROR" || strings.Contains(line, "+CME ERROR") {
