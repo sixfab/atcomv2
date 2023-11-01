@@ -119,7 +119,7 @@ func SendAT(command string, args map[string]interface{}) ([]string, error) {
 
 					for _, faultStr := range fault {
 						if strings.Contains(data, faultStr) {
-							found <- nil
+							found <- errors.New("faulty response detected")
 							return
 						}
 					}
