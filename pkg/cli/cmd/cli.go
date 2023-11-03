@@ -10,12 +10,29 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// versionCmd represents the version command
 var versionCmd = &cobra.Command{
 	Use:   "version",
 	Short: "Print the version number",
 	Long:  `Print the version number`,
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println("Version:", atcom.Version)
+	},
+}
+
+// detectCmd represents the detect command
+var detectCmd = &cobra.Command{
+	Use:   "detect",
+	Short: "Detect the modem port",
+	Long:  `Detect the modem port`,
+	Run: func(cmd *cobra.Command, args []string) {
+		port, err := atcom.DecidePort()
+
+		if err != nil {
+			fmt.Println(err)
+		}
+
+		fmt.Println(port)
 	},
 }
 
@@ -123,4 +140,5 @@ func init() {
 	rootCmd.Flags().StringP("version", "V", "", "version")
 
 	rootCmd.AddCommand(versionCmd)
+	rootCmd.AddCommand(detectCmd)
 }
