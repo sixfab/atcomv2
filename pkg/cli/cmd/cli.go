@@ -26,13 +26,35 @@ var detectCmd = &cobra.Command{
 	Short: "Detect the modem port",
 	Long:  `Detect the modem port`,
 	Run: func(cmd *cobra.Command, args []string) {
-		port, err := atcom.DecidePort()
+
+		allFlag := cmd.Flag("all").Value.String()
+		vidFlag := cmd.Flag("vid").Value.String()
+		pidFlag := cmd.Flag("pid").Value.String()
+		portFlag := cmd.Flag("port").Value.String()
+
+		modem, err := atcom.DecidePort()
 
 		if err != nil {
 			fmt.Println(err)
 		}
 
-		fmt.Println(port)
+		if allFlag == "true" {
+			for key, value := range modem {
+				fmt.Println(key + ":" + value)
+			}
+		}
+
+		if vidFlag == "true" {
+			fmt.Println(modem["vendor_id"])
+		}
+
+		if pidFlag == "true" {
+			fmt.Println(modem["product_id"])
+		}
+
+		if portFlag == "true" {
+			fmt.Println(modem["port"])
+		}
 	},
 }
 
@@ -141,4 +163,9 @@ func init() {
 
 	rootCmd.AddCommand(versionCmd)
 	rootCmd.AddCommand(detectCmd)
+
+	detectCmd.Flags().BoolP("all", "a", false, "all modem attributes")
+	detectCmd.Flags().BoolP("vid", "v", false, "vendor id")
+	detectCmd.Flags().BoolP("pid", "i", false, "product id")
+	detectCmd.Flags().BoolP("port", "p", false, "serial port")
 }

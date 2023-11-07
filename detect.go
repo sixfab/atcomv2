@@ -92,26 +92,33 @@ func findModems() (SupportedModem, error) {
 	return SupportedModem{}, nil
 }
 
-func DecidePort() (string, error) {
+func DecidePort() (map[string]string, error) {
 	modem, err := findModems()
 
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	ports, err := getAvailablePorts()
 
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	for _, port := range ports {
 		if port["vendor_id"] == modem.vid &&
 			port["product_id"] == modem.pid &&
 			port["interface"] == modem.ifs {
-			return port["port"], nil
+
+			detectedModem := map[string]string{
+				"port":       port["port"],
+				"vendor_id":  port["vendor_id"],
+				"product_id": port["product_id"],
+			}
+
+			return detectedModem, nil
 		}
 	}
 
-	return "", nil
+	return nil, nil
 }
