@@ -111,9 +111,11 @@ func DecidePort() (map[string]string, error) {
 			port["interface"] == modem.ifs {
 
 			detectedModem := map[string]string{
-				"port":       port["port"],
-				"vendor_id":  port["vendor_id"],
-				"product_id": port["product_id"],
+				"port":   port["port"],
+				"vid":    port["vendor_id"],
+				"pid":    port["product_id"],
+				"vendor": port["vendor"],
+				"model":  port["model"],
 			}
 
 			return detectedModem, nil

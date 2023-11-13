@@ -55,6 +55,10 @@ var detectCmd = &cobra.Command{
 		if portFlag == "true" {
 			fmt.Println(modem["port"])
 		}
+
+		if allFlag == "false" && vidFlag == "false" && pidFlag == "false" && portFlag == "false" {
+			fmt.Println(modem["port"])
+		}
 	},
 }
 
