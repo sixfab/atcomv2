@@ -7,7 +7,7 @@ import (
 
 func TestGetMeaningfulPart(t *testing.T) {
 
-	t.Run("error for 'not OK' response", func(t *testing.T) {
+	t.Run("'not OK' response error", func(t *testing.T) {
 		response := []string{"command: command", "not OK"}
 		_, _, err := GetMeaningfulPart(response, "command", "")
 		if err.Error() != "no ok response" {
@@ -15,7 +15,7 @@ func TestGetMeaningfulPart(t *testing.T) {
 		}
 	})
 
-	t.Run("error for empty response", func(t *testing.T) {
+	t.Run("Empty response error", func(t *testing.T) {
 		response := []string{}
 		_, _, err := GetMeaningfulPart(response, "command", "")
 		if err.Error() != "no ok response" {
@@ -37,14 +37,14 @@ func TestGetMeaningfulPart(t *testing.T) {
 	})
 
 	t.Run("Valid response with prefix", func(t *testing.T) {
-		response4 := []string{"command: someCommand", "prefixData1", "prefixData2", "OK"}
-		data, len, err := GetMeaningfulPart(response4, "command", "prefix")
+		response := []string{"command: someCommand", "prefixData1", "prefixData2", "OK"}
+		data, len, err := GetMeaningfulPart(response, "command", "prefix")
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}
-		expectedData4 := []string{"Data1", "Data2"}
-		expectedLen4 := 2
-		if !reflect.DeepEqual(data, expectedData4) || len != expectedLen4 {
+		expectedData := []string{"Data1", "Data2"}
+		expectedLen := 2
+		if !reflect.DeepEqual(data, expectedData) || len != expectedLen {
 			t.Errorf("Unexpected result. Got data: %v, len: %v", data, len)
 		}
 	})
