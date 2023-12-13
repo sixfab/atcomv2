@@ -20,12 +20,15 @@ func TestGetAvailablePorts(t *testing.T) {
 		execCommand := exec.Command("mkdir", mockUsbPath)
 		execCommand.Run()
 
+		defer func() {
+			execCommand = exec.Command("rmdir", mockUsbPath)
+			execCommand.Run()
+		}()
+
 		_, err := getAvailablePorts()
 		if err != nil {
 			t.Errorf("Expected no error, but got %v", err)
 		}
-		execCommand = exec.Command("rmdir", mockUsbPath)
-		execCommand.Run()
 	})
 	/*
 			t.Run("Valid ports", func(t *testing.T) {
