@@ -6,7 +6,6 @@ Copyright (c) 2023 Sixfab Inc.
 package atcom
 
 import (
-	"bufio"
 	"context"
 	"errors"
 	"strings"
@@ -75,8 +74,7 @@ func SendAT(command string, args map[string]interface{}) ([]string, error) {
 		return nil, err
 	}
 
-	scanner := bufio.NewScanner(serialPort)
-	response := make([]string, 0)
+	data := make([]string, 0)
 	timeoutDuration := time.Duration(timeout) * time.Second
 
 	found := make(chan error)
@@ -86,48 +84,63 @@ func SendAT(command string, args map[string]interface{}) ([]string, error) {
 	defer cancelScan()
 
 	go func(ctx context.Context) {
+		response := ""
+		buf := make([]byte, 1024)
+
 		for {
-			if !scanner.Scan() {
+			time.Sleep(time.Millisecond * 5)
+			n, err := serialPort.Read(buf)
+			if err != nil {
+				if err.Error() == "EOF" {
+					continue
+				}
+				found <- err
 				return
 			}
-			line := scanner.Text()
-			line = strings.TrimSpace(line)
-			line = strings.Trim(line, "\r")
-			line = strings.Trim(line, "\n")
-
-			if line != "" {
-				response = append(response, line)
+			if n > 0 {
+				response += string(buf[:n])
 			}
 
-			if line == "OK" {
-				// make response string to check desired and fault
-				data := ""
-				for _, word := range response {
-					if word != "OK" {
-						data += word
+			if strings.Contains(response, "\r\nOK\r\n") {
+				lines := strings.Split(response, "\r\n")
+
+				for _, line := range lines {
+					line = strings.TrimSpace(line)
+					line = strings.Trim(line, "\r")
+					line = strings.Trim(line, "\n")
+
+					if line != "" {
+						data = append(data, line)
+					}
+
+					if line == "OK" {
+						break
 					}
 				}
 
 				// check desired and fault existed in response
 				if desired != nil || fault != nil {
 					for _, desiredStr := range desired {
-						if strings.Contains(data, desiredStr) {
+						if strings.Contains(response, desiredStr) {
 							found <- nil
 							return
 						}
-					}
 
-					for _, faultStr := range fault {
-						if strings.Contains(data, faultStr) {
-							found <- errors.New("faulty response detected")
-							return
+						for _, faultStr := range fault {
+							if strings.Contains(response, faultStr) {
+								found <- errors.New("faulty response detected")
+								return
+							}
 						}
 					}
 				} else {
 					found <- nil
 					return
 				}
-			} else if line == "ERROR" || strings.Contains(line, "+CME ERROR") {
+
+				found <- nil
+				return
+			} else if strings.Contains(response, "\r\nERROR\r\n") {
 				found <- errors.New("modem error")
 				return
 			}
@@ -139,10 +152,10 @@ func SendAT(command string, args map[string]interface{}) ([]string, error) {
 	for {
 		select {
 		case err := <-found:
-			return response, err
+			return data, err
 		case <-timeoutCh:
 			cancelScan()
-			return response, errors.New("timeout")
+			return data, errors.New("timeout")
 		}
 	}
 }
