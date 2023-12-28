@@ -1,23 +1,20 @@
 package atcom
 
 import (
-	"os/exec"
+	"errors"
 	"strings"
 )
 
-func getAvailablePorts() (availablePorts []map[string]string, err error) {
-	cmd := exec.Command("bash", "-c", "/usr/bin/find /sys/bus/usb/devices/usb*/ -name dev")
-	output, err := cmd.Output()
+func (t *Atcom) getAvailablePorts() (availablePorts []map[string]string, err error) {
+	output, err := t.shell.Command("bash", "-c", "/usr/bin/find /sys/bus/usb/devices/usb*/ -name dev")
 
 	if err != nil {
 		return nil, err
 	}
 
-	outputStr := string(output)
-
 	ports := make([]string, 0)
 
-	for _, port := range strings.Split(outputStr, "\n") {
+	for _, port := range strings.Split(output, "\n") {
 		if strings.HasSuffix(port, "/dev") {
 			port = strings.TrimSuffix(port, "/dev")
 			ports = append(ports, port)
@@ -25,16 +22,13 @@ func getAvailablePorts() (availablePorts []map[string]string, err error) {
 	}
 
 	for _, port := range ports {
-		cmd := exec.Command("bash", "-c", "udevadm info -q property --export -p "+port)
-		output, err := cmd.Output()
+		output, err := t.shell.Command("bash", "-c", "udevadm info -q property --export -p "+port)
 
 		if err != nil {
 			return nil, err
 		}
 
-		outputStr := string(output)
-
-		deviceDetails := strings.Split(outputStr, "\n")
+		deviceDetails := strings.Split(output, "\n")
 
 		portDetails := make(map[string]string)
 
@@ -68,38 +62,32 @@ func getAvailablePorts() (availablePorts []map[string]string, err error) {
 	return availablePorts, nil
 }
 
-func findModems() (SupportedModem, error) {
-	cmd := exec.Command("lsusb")
-	output, err := cmd.Output()
+func (t *Atcom) findModem(smodems []SupportedModem) (SupportedModem, error) {
+	output, err := t.shell.Command("lsusb")
 
 	if err != nil {
 		return SupportedModem{}, err
 	}
 
-	outputStr := string(output)
-
-	for _, modem := range supportedModems {
-		if outputStr == "" {
-			return modem, nil
-		}
-
-		for _, line := range strings.Split(outputStr, "\n") {
+	for _, modem := range smodems {
+		for _, line := range strings.Split(output, "\n") {
 			if strings.Contains(line, modem.vid) && strings.Contains(line, modem.pid) {
 				return modem, nil
 			}
 		}
 	}
-	return SupportedModem{}, nil
+
+	return SupportedModem{}, errors.New("no supported modem found")
 }
 
-func DecidePort() (map[string]string, error) {
-	modem, err := findModems()
+func (t *Atcom) DecidePort() (map[string]string, error) {
+	modem, err := t.findModem(supportedModems)
 
 	if err != nil {
 		return nil, err
 	}
 
-	ports, err := getAvailablePorts()
+	ports, err := t.getAvailablePorts()
 
 	if err != nil {
 		return nil, err

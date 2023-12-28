@@ -8,13 +8,65 @@ package atcom
 import (
 	"context"
 	"errors"
+	"os/exec"
 	"strings"
 	"time"
 
 	"github.com/tarm/serial"
 )
 
-func open(args map[string]interface{}) (port *serial.Port, err error) {
+type Atcom struct {
+	serial Serial
+	shell  Shell
+}
+
+// Serial Implementation for normal usage
+type RealSerial struct{}
+
+// Serial interface
+type Serial interface {
+	OpenPort(c *serial.Config) (*serial.Port, error)
+}
+
+// RealSerial implements Serial interface
+func (s *RealSerial) OpenPort(c *serial.Config) (*serial.Port, error) {
+	return serial.OpenPort(c)
+}
+
+// Shell Implementation for normal usage
+type RealShell struct{}
+
+// Shell interface
+type Shell interface {
+	Command(name string, arg ...string) (string, error)
+}
+
+// RealShell implements Shell interface
+func (s *RealShell) Command(name string, arg ...string) (string, error) {
+	cmd := exec.Command(name, arg...)
+	output, err := cmd.Output()
+	return string(output), err
+}
+
+// NewAtcom creates a new Atcom instance with default serial and shell implementations
+func NewAtcom(s Serial, sh Shell) *Atcom {
+
+	if s == nil {
+		s = &RealSerial{}
+	}
+
+	if sh == nil {
+		sh = &RealShell{}
+	}
+
+	return &Atcom{
+		serial: s,
+		shell:  sh,
+	}
+}
+
+// Function to open serial port
+func (t *Atcom) open(args map[string]interface{}) (port *serial.Port, err error) {
 
 	portname := "/dev/ttyUSB2"
 	baudrate := 115200
@@ -34,10 +86,11 @@ func open(args map[string]interface{}) (port *serial.Port, err error) {
 		ReadTimeout: time.Millisecond * 100,
 	}
 
-	return serial.OpenPort(config)
+	return t.serial.OpenPort(config)
 }
 
-func SendAT(command string, args map[string]interface{}) ([]string, error) {
+// SendAT sends AT command to modem and returns response
+func (t *Atcom) SendAT(command string, args map[string]interface{}) ([]string, error) {
 
 	var lineEnd bool = true
 	var desired []string = nil
@@ -57,7 +110,7 @@ func SendAT(command string, args map[string]interface{}) ([]string, error) {
 		}
 	}
 
-	serialPort, err := open(args)
+	serialPort, err := t.open(args)
 
 	if err != nil {
 		return nil, err
