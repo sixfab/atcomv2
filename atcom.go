@@ -21,16 +21,32 @@ type Atcom struct {
 }
 
 // Serial Implementation for normal usage
-type RealSerial struct{}
+type RealSerial struct {
+}
 
 // Serial interface
 type Serial interface {
 	OpenPort(c *serial.Config) (*serial.Port, error)
+	Write(port *serial.Port, command []byte) (n int, err error)
+	Close(port *serial.Port) (err error)
+	Read(port *serial.Port, buffer []byte) (n int, err error)
 }
 
 // RealSerial implements Serial interface
 func (s *RealSerial) OpenPort(c *serial.Config) (*serial.Port, error) {
 	return serial.OpenPort(c)
+}
+
+func (s *RealSerial) Write(port *serial.Port, command []byte) (n int, err error) {
+	return port.Write([]byte(command))
+}
+
+func (s *RealSerial) Close(port *serial.Port) (err error) {
+	return port.Close()
+}
+
+func (s *RealSerial) Read(port *serial.Port, buffer []byte) (n int, err error) {
+	return port.Read(buffer)
 }
 
 // Shell Implementation for normal usage
@@ -116,13 +132,13 @@ func (t *Atcom) SendAT(command string, args map[string]interface{}) ([]string, e
 		return nil, err
 	}
 
-	defer serialPort.Close()
+	defer t.serial.Close(serialPort)
 
 	if lineEnd {
 		command += "\r\n"
 	}
 
-	_, err = serialPort.Write([]byte(command))
+	_, err = t.serial.Write(serialPort, []byte(command))
 	if err != nil {
 		return nil, err
 	}
@@ -142,7 +158,7 @@ func (t *Atcom) SendAT(command string, args map[string]interface{}) ([]string, e
 
 		for {
 			time.Sleep(time.Millisecond * 5)
-			n, err := serialPort.Read(buf)
+			n, err := t.serial.Read(serialPort, buf)
 			if err != nil {
 				if err.Error() == "EOF" {
 					continue
