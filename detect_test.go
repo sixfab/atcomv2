@@ -114,7 +114,7 @@ func TestGetAvailablePorts(t *testing.T) {
 		mockShell.Patch(commandName, mockUdevadmOutput1, error)
 		defer func() { mockShell.mocked[commandName] = mockedDefault }()
 
-		at := NewAtcom(nil, mockShell)
+		at := NewAtcom(nil, mockShell, nil)
 		_, err := at.getAvailablePorts()
 
 		if err.Error() != error.Error() {
@@ -131,7 +131,7 @@ func TestGetAvailablePorts(t *testing.T) {
 		mockShell.Patch(commandName, mockUdevadmOutput2, error)
 		defer func() { mockShell.mocked[commandName] = mockedDefault }()
 
-		at := NewAtcom(nil, mockShell)
+		at := NewAtcom(nil, mockShell, nil)
 		_, err := at.getAvailablePorts()
 
 		if err != error {
@@ -141,7 +141,7 @@ func TestGetAvailablePorts(t *testing.T) {
 
 	t.Run("Should return available ports", func(t *testing.T) {
 
-		at := NewAtcom(nil, mockShell)
+		at := NewAtcom(nil, mockShell, nil)
 
 		availablePorts, err := at.getAvailablePorts()
 
@@ -169,7 +169,7 @@ func TestFindModem(t *testing.T) {
 
 		defer func() { mockShell.mocked["lsusb"] = mockedDefault }()
 
-		at := NewAtcom(nil, mockShell)
+		at := NewAtcom(nil, mockShell, nil)
 		_, err := at.findModem(supportedModems)
 
 		if err.Error() != error.Error() {
@@ -201,7 +201,7 @@ Bus 003 Device 001: ID 1d6b:0002 Linux Foundation 2.0 root hub`
 			mockShell.Patch("lsusb", tt.device, nil)
 			defer func() { mockShell.mocked["lsusb"] = mockedDefault }()
 
-			at := NewAtcom(nil, mockShell)
+			at := NewAtcom(nil, mockShell, nil)
 
 			t.Run(tt.name, func(t *testing.T) {
 
@@ -230,7 +230,7 @@ Bus 003 Device 001: ID 1d6b:0002 Linux Foundation 2.0 root hub`
 		mockShell.Patch("lsusb", tempDeviceOutput, nil)
 		defer func() { mockShell.mocked["lsusb"] = mockedDefault }()
 
-		at := NewAtcom(nil, mockShell)
+		at := NewAtcom(nil, mockShell, nil)
 
 		modem, err := at.findModem(supportedModems)
 
@@ -261,7 +261,7 @@ Bus 003 Device 001: ID 1d6b:0002 Linux Foundation 2.0 root hub`
 		mockShell.Patch("lsusb", tempDeviceOutput, nil)
 		defer func() { mockShell.mocked["lsusb"] = mockedDefault }()
 
-		at := NewAtcom(nil, mockShell)
+		at := NewAtcom(nil, mockShell, nil)
 
 		_, err := at.DecidePort()
 
@@ -282,7 +282,7 @@ Bus 003 Device 001: ID 1d6b:0002 Linux Foundation 2.0 root hub`
 		mockShell.Patch(commandName, mockUdevadmOutput1, error)
 		defer func() { mockShell.mocked[commandName] = mockedDefault }()
 
-		at := NewAtcom(nil, mockShell)
+		at := NewAtcom(nil, mockShell, nil)
 		_, err := at.DecidePort()
 
 		if err.Error() != error.Error() {
@@ -292,7 +292,7 @@ Bus 003 Device 001: ID 1d6b:0002 Linux Foundation 2.0 root hub`
 
 	t.Run("Should return detected modem", func(t *testing.T) {
 
-		at := NewAtcom(nil, mockShell)
+		at := NewAtcom(nil, mockShell, nil)
 		detectedModem, err := at.DecidePort()
 
 		expectedDetectedModem := map[string]string{
@@ -320,7 +320,7 @@ Bus 003 Device 001: ID 1d6b:0002 Linux Foundation 2.0 root hub`
 		mockShell.Patch(commandName, "Bus 001 Device 002: ID 2c7c:0121 Quectel Wireless Solutions Co., Ltd. EC21 LTE modem", nil)
 		defer func() { mockShell.mocked[commandName] = mockedDefault }()
 
-		at := NewAtcom(nil, mockShell)
+		at := NewAtcom(nil, mockShell, nil)
 		detectedModem, err := at.DecidePort()
 
 		if detectedModem != nil {

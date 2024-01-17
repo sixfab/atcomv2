@@ -8,7 +8,7 @@ import (
 
 func main() {
 
-	at := atcom.NewAtcom(nil, nil)
+	at := atcom.NewAtcom(nil, nil, nil)
 
 	port, err := at.DecidePort()
 

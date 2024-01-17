@@ -32,7 +32,7 @@ var detectCmd = &cobra.Command{
 		pidFlag := cmd.Flag("pid").Value.String()
 		portFlag := cmd.Flag("port").Value.String()
 
-		at := atcom.NewAtcom(nil, nil)
+		at := atcom.NewAtcom(nil, nil, nil)
 
 		modem, err := at.DecidePort()
 
@@ -127,7 +127,7 @@ var rootCmd = &cobra.Command{
 			fmt.Println("")
 		}
 
-		at := atcom.NewAtcom(nil, nil)
+		at := atcom.NewAtcom(nil, nil, nil)
 
 		response, err := at.SendAT(command, comArgs)
 
