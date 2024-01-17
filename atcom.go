@@ -18,6 +18,7 @@ import (
 type Atcom struct {
 	serial Serial
 	shell  Shell
+	Sleep  func(d time.Duration)
 }
 
 // Serial Implementation for normal usage
@@ -65,7 +66,7 @@ func (s *RealShell) Command(name string, arg ...string) (string, error) {
 }
 
 // NewAtcom creates a new Atcom instance with default serial and shell implementations
-func NewAtcom(s Serial, sh Shell) *Atcom {
+func NewAtcom(s Serial, sh Shell, sl func(time.Duration)) *Atcom {
 
 	if s == nil {
 		s = &RealSerial{}
@@ -75,9 +76,14 @@ func NewAtcom(s Serial, sh Shell) *Atcom {
 		sh = &RealShell{}
 	}
 
+	if sl == nil {
+		sl = time.Sleep
+	}
+
 	return &Atcom{
 		serial: s,
 		shell:  sh,
+		Sleep:  sl,
 	}
 }
 
@@ -157,7 +163,7 @@ func (t *Atcom) SendAT(command string, args map[string]interface{}) ([]string, e
 		buf := make([]byte, 1024)
 
 		for {
-			time.Sleep(time.Millisecond * 5)
+			t.Sleep(time.Millisecond * 5)
 			n, err := t.serial.Read(serialPort, buf)
 			if err != nil {
 				if err.Error() == "EOF" {
