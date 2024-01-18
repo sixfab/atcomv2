@@ -212,17 +212,17 @@ func TestSendAT(t *testing.T) {
 		}
 	})
 
-	t.Run("Should return error for Read function", func(t *testing.T) {
+	t.Run("Should return error", func(t *testing.T) {
 
 		commandName := "Read"
 		mockedDefault := mockSerial.mocked[commandName]
-		error := errors.New("Read Error")
+		error := errors.New("modem error")
 
 		mockSerial.Patch(commandName, mockRead, error)
 		defer func() { mockSerial.mocked[commandName] = mockedDefault }()
 
 		at := NewAtcom(mockSerial, nil, mockSleepFunc)
-		_, err := at.SendAT("ATE1", nil)
+		_, err := at.SendAT("AT#ECMD=0", nil)
 
 		if err.Error() != error.Error() {
 			t.Errorf("Expected error %v, but got %v", error, err)
@@ -238,6 +238,8 @@ func TestSendAT(t *testing.T) {
 			desired_response []string
 		}{
 			{"ATE0", 6, "\r\nOK\r\n", []string{"OK"}},
+			{"ATE1", 11, "ATE1\r\r\nOK\r\n", []string{"ATE1", "OK"}},
+			{"AT+COPS?", 27, "AT+COPS?\r\r\n+COPS: 0\r\n\r\nOK\r\n", []string{"AT+COPS?", "+COPS: 0", "OK"}},
 		}
 
 		for _, tt := range parameters {
@@ -284,6 +286,79 @@ func TestSendAT(t *testing.T) {
 		error := errors.New("timeout")
 		if err.Error() != error.Error() {
 			t.Errorf("Expected error %v, but got %v", error, err)
+		}
+	})
+
+	t.Run("Should return response ", func(t *testing.T) {
+
+		commandName := "Read"
+		mockedDefault := mockSerial.mocked[commandName]
+
+		error := errors.New("timeout")
+		mockSerial.Patch(commandName, 0, error)
+		defer func() { mockSerial.mocked[commandName] = mockedDefault }()
+
+		at := NewAtcom(mockSerial, nil, mockSleepFunc)
+		_, err := at.SendAT("AT+COPS=?", nil)
+
+		if err.Error() != error.Error() {
+			t.Errorf("Expected error %v, but got %v", error, err)
+		}
+	})
+
+	t.Run("Should return response for desired argument", func(t *testing.T) {
+
+		commandName := "Read"
+		mockedDefault := mockSerial.mocked[commandName]
+
+		mockSerial.Patch(commandName, 27, nil)
+
+		mockBuffer = "AT+COPS?\r\r\n+COPS: 0\r\n\r\nOK\r\n"
+
+		defer func() {
+			mockSerial.mocked[commandName] = mockedDefault
+			mockBuffer = ""
+		}()
+
+		at := NewAtcom(mockSerial, nil, mockSleepFunc)
+		arg := map[string]interface{}{"desired": []string{"+COPS"}}
+		res, err := at.SendAT("AT+COPS?", arg)
+
+		if err != nil {
+			t.Errorf("Expected nil error, but got %v", err)
+		}
+
+		expectedResult := []string{"AT+COPS?", "+COPS: 0", "OK"}
+		if !reflect.DeepEqual(res, expectedResult) {
+			t.Errorf("Expected %s, but got %s", expectedResult, res)
+		}
+	})
+
+	t.Run("Should return response for fault argument", func(t *testing.T) {
+
+		commandName := "Read"
+		mockedDefault := mockSerial.mocked[commandName]
+
+		mockSerial.Patch(commandName, 27, nil)
+
+		mockBuffer = "AT+COPS?\r\r\n+COPS: 0\r\n\r\nOK\r\n"
+
+		defer func() {
+			mockSerial.mocked[commandName] = mockedDefault
+			mockBuffer = ""
+		}()
+
+		at := NewAtcom(mockSerial, nil, mockSleepFunc)
+		arg := map[string]interface{}{"fault": []string{"+COPS"}}
+		res, err := at.SendAT("AT+COPS?", arg)
+
+		if err != nil {
+			t.Errorf("Expected nil error, but got %v", err)
+		}
+
+		expectedResult := []string{"AT+COPS?", "+COPS: 0", "OK"}
+		if !reflect.DeepEqual(res, expectedResult) {
+			t.Errorf("Expected %s, but got %s", expectedResult, res)
 		}
 	})
 
