@@ -67,7 +67,8 @@ var mockShell = &MockShell{
 			"resp": mockUdevadmOutput1,
 			"err":  nil,
 		},
-		"bash -c udevadm info -q property --export -p /sys/bus/usb/devices/usb1/1-2/1-2:1.2/ttyUSB2/tty/ttyUSB2": map[string]interface{}{
+		"bash -c udevadm info -q property --export -p" +
+			" /sys/bus/usb/devices/usb1/1-2/1-2:1.2/ttyUSB2/tty/ttyUSB2": map[string]interface{}{
 			"resp": mockUdevadmOutput2,
 			"err":  nil,
 		},
@@ -124,7 +125,9 @@ func TestGetAvailablePorts(t *testing.T) {
 
 	t.Run("Should return error for udevadm", func(t *testing.T) {
 
-		commandName := "bash -c udevadm info -q property --export -p /sys/bus/usb/devices/usb1/1-2/1-2:1.2/ttyUSB2/tty/ttyUSB2"
+		commandName := "bash -c udevadm info -q property --export -p " +
+			"/sys/bus/usb/devices/usb1/1-2/1-2:1.2/ttyUSB2/tty/ttyUSB2"
+
 		mockedDefault := mockShell.mocked[commandName]
 		error := errors.New("udevadm error")
 
@@ -184,15 +187,32 @@ Bus 001 Device 001: ID 1d6b:0002 Linux Foundation 2.0 root hub
 Bus 002 Device 001: ID 1d6b:0003 Linux Foundation 3.0 root hub
 Bus 003 Device 001: ID 1d6b:0002 Linux Foundation 2.0 root hub`
 
-		tests := []struct {
+		ec25Bus := "Bus 001 Device 002: ID 2c7c:0125 Quectel Wireless Solutions Co., Ltd. EC25 LTE modem"
+		bg96Bus := "Bus 001 Device 002: ID 2c7c:0296 Quectel Wireless Solutions Co., Ltd. BG96 LTE modem"
+		le910Bus := "Bus 001 Device 002: ID 1bc7:1201 Telit Wireless Solutions Co., Ltd. LE910Cx RMNET LTE modem"
+		plsBus := "Bus 001 Device 002: ID 1e2d:0069 Thales/Cinterion Wireless Solutions Co., Ltd. PLSx3 LTE modem"
+
+		type Test struct {
 			device string
 			name   string
 			want   SupportedModem
-		}{
-			{"Bus 001 Device 002: ID 2c7c:0125 Quectel Wireless Solutions Co., Ltd. EC25 LTE modem" + bus_devices, "Quectel EC25", SupportedModem{"2c7c", "0125", "Quectel", "EC25", "if02"}},
-			{"Bus 001 Device 002: ID 2c7c:0296 Quectel Wireless Solutions Co., Ltd. BG96 LTE modem" + bus_devices, "Quectel BG96", SupportedModem{"2c7c", "0296", "Quectel", "BG96", "if02"}},
-			{"Bus 001 Device 002: ID 1bc7:1201 Telit Wireless Solutions Co., Ltd. LE910Cx RMNET LTE modem" + bus_devices, "Telit LE910Cx RMNET", SupportedModem{"1bc7", "1201", "Telit", "LE910Cx RMNET", "if04"}},
-			{"Bus 001 Device 002: ID 1e2d:0069 Thales/Cinterion Wireless Solutions Co., Ltd. PLSx3 LTE modem" + bus_devices, "Thales/Cinterion PLSx3", SupportedModem{"1e2d", "0069", "Thales/Cinterion", "PLSx3", "if04"}},
+		}
+
+		tests := []Test{
+			{
+				ec25Bus + bus_devices, "Quectel EC25",
+				SupportedModem{"2c7c", "0125", "Quectel", "EC25", "if02"}},
+			{
+				bg96Bus + bus_devices, "Quectel BG96",
+				SupportedModem{"2c7c", "0296", "Quectel", "BG96", "if02"}},
+			{
+				le910Bus + bus_devices,
+				"Telit LE910Cx RMNET",
+				SupportedModem{"1bc7", "1201", "Telit", "LE910Cx RMNET", "if04"}},
+			{
+				plsBus + bus_devices,
+				"Thales/Cinterion PLSx3",
+				SupportedModem{"1e2d", "0069", "Thales/Cinterion", "PLSx3", "if04"}},
 		}
 
 		for _, tt := range tests {
@@ -317,7 +337,11 @@ Bus 003 Device 001: ID 1d6b:0002 Linux Foundation 2.0 root hub`
 
 		mockedDefault := mockShell.mocked[commandName]
 
-		mockShell.Patch(commandName, "Bus 001 Device 002: ID 2c7c:0121 Quectel Wireless Solutions Co., Ltd. EC21 LTE modem", nil)
+		mockShell.Patch(
+			commandName,
+			"Bus 001 Device 002: ID 2c7c:0121 Quectel Wireless Solutions Co., Ltd. EC21 LTE modem",
+			nil)
+
 		defer func() { mockShell.mocked[commandName] = mockedDefault }()
 
 		at := NewAtcom(nil, mockShell, nil)

@@ -10,7 +10,7 @@ import (
 	"github.com/tarm/serial"
 )
 
-type SerialShell struct {
+type MockSerial struct {
 	mocked map[string]interface{}
 }
 
@@ -22,7 +22,7 @@ var (
 	mockBuffer     = ""
 )
 
-var serialShell = &SerialShell{
+var mockSerial = &MockSerial{
 	mocked: map[string]interface{}{
 		"openPort": map[string]interface{}{
 			"resp": mockSerialPort,
@@ -35,16 +35,15 @@ var serialShell = &SerialShell{
 		"Read": map[string]interface{}{
 			"resp": mockRead,
 			"err":  nil,
-			//"buffer": "",
 		},
 	},
 }
 
-func (t *SerialShell) Patch(cmd string, resp interface{}, err error) {
+func (t *MockSerial) Patch(cmd string, resp interface{}, err error) {
 	t.mocked[cmd] = map[string]interface{}{"resp": resp, "err": err}
 }
 
-func (t *SerialShell) OpenPort(c *serial.Config) (*serial.Port, error) {
+func (t *MockSerial) OpenPort(c *serial.Config) (*serial.Port, error) {
 
 	for mocked_name := range t.mocked {
 
@@ -60,7 +59,7 @@ func (t *SerialShell) OpenPort(c *serial.Config) (*serial.Port, error) {
 	return nil, nil
 }
 
-func (t *SerialShell) Write(port *serial.Port, command []byte) (n int, err error) {
+func (t *MockSerial) Write(port *serial.Port, command []byte) (n int, err error) {
 	for mocked_name := range t.mocked {
 
 		if mocked_name == "Write" {
@@ -76,11 +75,11 @@ func (t *SerialShell) Write(port *serial.Port, command []byte) (n int, err error
 	return 5, nil
 }
 
-func (t *SerialShell) Close(port *serial.Port) (err error) {
+func (t *MockSerial) Close(port *serial.Port) (err error) {
 	return nil
 }
 
-func (t *SerialShell) Read(port *serial.Port, buf []byte) (n int, err error) {
+func (t *MockSerial) Read(port *serial.Port, buf []byte) (n int, err error) {
 
 	for mocked_name := range t.mocked {
 
@@ -111,10 +110,11 @@ func TestNewAtcom(t *testing.T) {
 			desired *Atcom
 		}{
 			{"no mocking", nil, nil, nil, &Atcom{&RealSerial{}, &RealShell{}, time.Sleep}},
-			{"mocking serial", &SerialShell{}, nil, nil, &Atcom{&SerialShell{}, &RealShell{}, time.Sleep}},
+			{"mocking serial", &MockSerial{}, nil, nil, &Atcom{&MockSerial{}, &RealShell{}, time.Sleep}},
 			{"mocking shell", nil, &MockShell{}, nil, &Atcom{&RealSerial{}, &MockShell{}, time.Sleep}},
 			{"mocking Sleep", nil, nil, mockSleepFunc, &Atcom{&RealSerial{}, &RealShell{}, mockSleepFunc}},
-			{"mocking all", &SerialShell{}, &MockShell{}, mockSleepFunc, &Atcom{&SerialShell{}, &MockShell{}, mockSleepFunc}},
+			{"mocking all", &MockSerial{}, &MockShell{}, mockSleepFunc, &Atcom{&MockSerial{},
+				&MockShell{}, mockSleepFunc}},
 		}
 
 		for _, tt := range parameters {
@@ -141,7 +141,7 @@ func TestOpen(t *testing.T) {
 
 	t.Run("Should return port with nil input parameter", func(t *testing.T) {
 
-		at := NewAtcom(serialShell, nil, nil)
+		at := NewAtcom(mockSerial, nil, nil)
 		port, err := at.open(nil)
 
 		expectedPort := &serial.Port{}
@@ -156,7 +156,7 @@ func TestOpen(t *testing.T) {
 
 	t.Run("Should return port with input parameter", func(t *testing.T) {
 
-		at := NewAtcom(serialShell, nil, nil)
+		at := NewAtcom(mockSerial, nil, nil)
 
 		arg := map[string]interface{}{
 			"port": "/dev/ttyUSB2",
@@ -181,13 +181,13 @@ func TestSendAT(t *testing.T) {
 	t.Run("Should return error for open function", func(t *testing.T) {
 
 		commandName := "openPort"
-		mockedDefault := serialShell.mocked[commandName]
+		mockedDefault := mockSerial.mocked[commandName]
 		error := errors.New("Serial port error")
 
-		serialShell.Patch(commandName, mockSerialPort, error)
-		defer func() { serialShell.mocked[commandName] = mockedDefault }()
+		mockSerial.Patch(commandName, mockSerialPort, error)
+		defer func() { mockSerial.mocked[commandName] = mockedDefault }()
 
-		at := NewAtcom(serialShell, nil, nil)
+		at := NewAtcom(mockSerial, nil, nil)
 		_, err := at.SendAT("ATE1", nil)
 
 		if err.Error() != error.Error() {
@@ -198,13 +198,13 @@ func TestSendAT(t *testing.T) {
 	t.Run("Should return error for Write function", func(t *testing.T) {
 
 		commandName := "Write"
-		mockedDefault := serialShell.mocked[commandName]
+		mockedDefault := mockSerial.mocked[commandName]
 		error := errors.New("Write function error")
 
-		serialShell.Patch(commandName, mockWrite, error)
-		defer func() { serialShell.mocked[commandName] = mockedDefault }()
+		mockSerial.Patch(commandName, mockWrite, error)
+		defer func() { mockSerial.mocked[commandName] = mockedDefault }()
 
-		at := NewAtcom(serialShell, nil, nil)
+		at := NewAtcom(mockSerial, nil, nil)
 		_, err := at.SendAT("ATE1", nil)
 
 		if err.Error() != error.Error() {
@@ -215,13 +215,13 @@ func TestSendAT(t *testing.T) {
 	t.Run("Should return error for Read function", func(t *testing.T) {
 
 		commandName := "Read"
-		mockedDefault := serialShell.mocked[commandName]
+		mockedDefault := mockSerial.mocked[commandName]
 		error := errors.New("Read Error")
 
-		serialShell.Patch(commandName, mockRead, error)
-		defer func() { serialShell.mocked[commandName] = mockedDefault }()
+		mockSerial.Patch(commandName, mockRead, error)
+		defer func() { mockSerial.mocked[commandName] = mockedDefault }()
 
-		at := NewAtcom(serialShell, nil, mockSleepFunc)
+		at := NewAtcom(mockSerial, nil, mockSleepFunc)
 		_, err := at.SendAT("ATE1", nil)
 
 		if err.Error() != error.Error() {
@@ -245,16 +245,16 @@ func TestSendAT(t *testing.T) {
 			t.Run(tt.command, func(t *testing.T) {
 
 				commandName := "Read"
-				mockedDefault := serialShell.mocked[commandName]
-				serialShell.Patch(commandName, tt.mock_response, nil)
+				mockedDefault := mockSerial.mocked[commandName]
+				mockSerial.Patch(commandName, tt.mock_response, nil)
 
 				mockBuffer = tt.mock_buffer
 				defer func() {
-					serialShell.mocked[commandName] = mockedDefault
+					mockSerial.mocked[commandName] = mockedDefault
 					mockBuffer = ""
 				}()
 
-				at := NewAtcom(serialShell, nil, mockSleepFunc)
+				at := NewAtcom(mockSerial, nil, mockSleepFunc)
 
 				response, _ := at.SendAT(tt.command, nil)
 
@@ -265,19 +265,23 @@ func TestSendAT(t *testing.T) {
 		}
 
 	})
-
 	t.Run("Should return timeout", func(t *testing.T) {
 
 		commandName := "Read"
-		mockedDefault := serialShell.mocked[commandName]
+		mockedDefault := mockSerial.mocked[commandName]
+
+		mockSerial.Patch(commandName, 316, nil)
+		defer func() { mockSerial.mocked[commandName] = mockedDefault }()
+
+		at := NewAtcom(mockSerial, nil, mockSleepFunc)
+
+		args := map[string]interface{}{
+			"timeout": 1,
+		}
+
+		_, err := at.SendAT("AT+WRONGATCOMMAND", args)
 
 		error := errors.New("timeout")
-		serialShell.Patch(commandName, 0, error)
-		defer func() { serialShell.mocked[commandName] = mockedDefault }()
-
-		at := NewAtcom(serialShell, nil, mockSleepFunc)
-		_, err := at.SendAT("AT+COPS=?", nil)
-
 		if err.Error() != error.Error() {
 			t.Errorf("Expected error %v, but got %v", error, err)
 		}
