@@ -19,6 +19,7 @@ var (
 	mockWrite      = 2
 	mockSleepFunc  = func(d time.Duration) {}
 	mockRead       = 2
+	mockBuffer     = ""
 )
 
 var serialShell = &SerialShell{
@@ -79,14 +80,14 @@ func (t *SerialShell) Close(port *serial.Port) (err error) {
 	return nil
 }
 
-func (t *SerialShell) Read(port *serial.Port, buffer []byte) (n int, err error) {
+func (t *SerialShell) Read(port *serial.Port, buf []byte) (n int, err error) {
 
 	for mocked_name := range t.mocked {
 
 		if mocked_name == "Read" {
 			response, _ := t.mocked[mocked_name].(map[string]interface{})
 
-			//buffer = response["buffer"].(string)
+			copy(buf, []byte(mockBuffer))
 
 			if response["err"] == nil {
 				return response["resp"].(int), nil
@@ -227,38 +228,44 @@ func TestSendAT(t *testing.T) {
 			t.Errorf("Expected error %v, but got %v", error, err)
 		}
 	})
-	/*
-			t.Run("Should return successfull response", func(t *testing.T) {
 
-				parameters := []struct {
-					command          string
-					mock             int
-					desired_response string
-				}{
-					{"ATE1", 316, `[+COPS: (1,"AVEA","AVEA","28603",7),(1,"AVEA","AVEA","28603",2),(1,"TR TURKCELL","TCELL","28601",0),(1,"Vodafone Turkiye","VF-TR","28602",0),(1,"Vodafone Turkiye","VF-TR","28602",7),(1,"Vodafone Turkiye","VF-TR","28602",2),(1,"TR TURKCELL","TCELL","28601",7),(1,"TR TURKCELL","TCELL","28601",2),,(0-4),(0-2) OK]`},
+	t.Run("Should return successfull response", func(t *testing.T) {
+
+		parameters := []struct {
+			command          string
+			mock_response    int
+			mock_buffer      string
+			desired_response []string
+		}{
+			{"ATE0", 6, "\r\nOK\r\n", []string{"OK"}},
+		}
+
+		for _, tt := range parameters {
+
+			t.Run(tt.command, func(t *testing.T) {
+
+				commandName := "Read"
+				mockedDefault := serialShell.mocked[commandName]
+				serialShell.Patch(commandName, tt.mock_response, nil)
+
+				mockBuffer = tt.mock_buffer
+				defer func() {
+					serialShell.mocked[commandName] = mockedDefault
+					mockBuffer = ""
+				}()
+
+				at := NewAtcom(serialShell, nil, mockSleepFunc)
+
+				response, _ := at.SendAT(tt.command, nil)
+
+				if !reflect.DeepEqual(response, tt.desired_response) {
+					t.Errorf("Expected %s, but got %s", tt.desired_response, response)
 				}
-
-				for _, tt := range parameters {
-
-					t.Run(tt.command, func(t *testing.T) {
-
-						commandName := "Read"
-						mockedDefault := serialShell.mocked[commandName]
-
-						serialShell.Patch(commandName, tt.mock, nil)
-						defer func() { serialShell.mocked[commandName] = mockedDefault }()
-
-						at := NewAtcom(serialShell, nil, mockSleepFunc)
-						response, _ := at.SendAT(tt.command, nil)
-
-						if !reflect.DeepEqual(response, tt.desired_response) {
-							t.Errorf("Expected %v, but got %v", tt.desired_response, response)
-						}
-					})
-				}
-
 			})
+		}
 
+	})
+	/*
 		t.Run("Should return timeout", func(t *testing.T) {
 
 			commandName := "Read"
