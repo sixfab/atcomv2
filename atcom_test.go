@@ -265,22 +265,22 @@ func TestSendAT(t *testing.T) {
 		}
 
 	})
-	/*
-		t.Run("Should return timeout", func(t *testing.T) {
 
-			commandName := "Read"
-			mockedDefault := serialShell.mocked[commandName]
+	t.Run("Should return timeout", func(t *testing.T) {
 
-			serialShell.Patch(commandName, 316, nil)
-			defer func() { serialShell.mocked[commandName] = mockedDefault }()
+		commandName := "Read"
+		mockedDefault := serialShell.mocked[commandName]
 
-			at := NewAtcom(serialShell, nil, mockSleepFunc)
-			_, err := at.SendAT("AT+COPS=?", nil)
+		error := errors.New("timeout")
+		serialShell.Patch(commandName, 0, error)
+		defer func() { serialShell.mocked[commandName] = mockedDefault }()
 
-			error := errors.New("timeout")
-			if err.Error() != error.Error() {
-				t.Errorf("Expected error %v, but got %v", error, err)
-			}
-		})*/
+		at := NewAtcom(serialShell, nil, mockSleepFunc)
+		_, err := at.SendAT("AT+COPS=?", nil)
+
+		if err.Error() != error.Error() {
+			t.Errorf("Expected error %v, but got %v", error, err)
+		}
+	})
 
 }
