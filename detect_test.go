@@ -74,7 +74,7 @@ var mockShell = &MockShell{
 	},
 }
 
-func (t *MockShell) Patch(cmd string, resp string, err error) {
+func (t *MockShell) Patch(cmd string, resp interface{}, err error) {
 	t.mocked[cmd] = map[string]interface{}{"resp": resp, "err": err}
 }
 
