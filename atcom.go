@@ -200,14 +200,14 @@ func (t *Atcom) SendAT(command string, args map[string]interface{}) ([]string, e
 							found <- nil
 							return
 						}
-
-						for _, faultStr := range fault {
-							if strings.Contains(response, faultStr) {
-								found <- errors.New("faulty response detected")
-								return
-							}
+					}
+					for _, faultStr := range fault {
+						if strings.Contains(response, faultStr) {
+							found <- errors.New("faulty response detected")
+							return
 						}
 					}
+
 				} else {
 					found <- nil
 					return
