@@ -8,13 +8,87 @@ package atcom
 import (
 	"context"
 	"errors"
+	"os/exec"
 	"strings"
 	"time"
 
 	"github.com/tarm/serial"
 )
 
-func open(args map[string]interface{}) (port *serial.Port, err error) {
+type Atcom struct {
+	serial Serial
+	shell  Shell
+	Sleep  func(d time.Duration)
+}
+
+// Serial Implementation for normal usage
+type RealSerial struct {
+}
+
+// Serial interface
+type Serial interface {
+	OpenPort(c *serial.Config) (*serial.Port, error)
+	Write(port *serial.Port, command []byte) (n int, err error)
+	Close(port *serial.Port) (err error)
+	Read(port *serial.Port, buffer []byte) (n int, err error)
+}
+
+// RealSerial implements Serial interface
+func (s *RealSerial) OpenPort(c *serial.Config) (*serial.Port, error) {
+	return serial.OpenPort(c)
+}
+
+func (s *RealSerial) Write(port *serial.Port, command []byte) (n int, err error) {
+	return port.Write([]byte(command))
+}
+
+func (s *RealSerial) Close(port *serial.Port) (err error) {
+	return port.Close()
+}
+
+func (s *RealSerial) Read(port *serial.Port, buffer []byte) (n int, err error) {
+	return port.Read(buffer)
+}
+
+// Shell Implementation for normal usage
+type RealShell struct{}
+
+// Shell interface
+type Shell interface {
+	Command(name string, arg ...string) (string, error)
+}
+
+// RealShell implements Shell interface
+func (s *RealShell) Command(name string, arg ...string) (string, error) {
+	cmd := exec.Command(name, arg...)
+	output, err := cmd.Output()
+	return string(output), err
+}
+
+// NewAtcom creates a new Atcom instance with default serial and shell implementations
+func NewAtcom(s Serial, sh Shell, sl func(time.Duration)) *Atcom {
+
+	if s == nil {
+		s = &RealSerial{}
+	}
+
+	if sh == nil {
+		sh = &RealShell{}
+	}
+
+	if sl == nil {
+		sl = time.Sleep
+	}
+
+	return &Atcom{
+		serial: s,
+		shell:  sh,
+		Sleep:  sl,
+	}
+}
+
+// Function to open serial port
+func (t *Atcom) open(args map[string]interface{}) (port *serial.Port, err error) {
 
 	portname := "/dev/ttyUSB2"
 	baudrate := 115200
@@ -34,10 +108,11 @@ func open(args map[string]interface{}) (port *serial.Port, err error) {
 		ReadTimeout: time.Millisecond * 100,
 	}
 
-	return serial.OpenPort(config)
+	return t.serial.OpenPort(config)
 }
 
-func SendAT(command string, args map[string]interface{}) ([]string, error) {
+// SendAT sends AT command to modem and returns response
+func (t *Atcom) SendAT(command string, args map[string]interface{}) ([]string, error) {
 
 	var lineEnd bool = true
 	var desired []string = nil
@@ -57,19 +132,19 @@ func SendAT(command string, args map[string]interface{}) ([]string, error) {
 		}
 	}
 
-	serialPort, err := open(args)
+	serialPort, err := t.open(args)
 
 	if err != nil {
 		return nil, err
 	}
 
-	defer serialPort.Close()
+	defer t.serial.Close(serialPort)
 
 	if lineEnd {
 		command += "\r\n"
 	}
 
-	_, err = serialPort.Write([]byte(command))
+	_, err = t.serial.Write(serialPort, []byte(command))
 	if err != nil {
 		return nil, err
 	}
@@ -88,8 +163,8 @@ func SendAT(command string, args map[string]interface{}) ([]string, error) {
 		buf := make([]byte, 1024)
 
 		for {
-			time.Sleep(time.Millisecond * 5)
-			n, err := serialPort.Read(buf)
+			t.Sleep(time.Millisecond * 5)
+			n, err := t.serial.Read(serialPort, buf)
 			if err != nil {
 				if err.Error() == "EOF" {
 					continue
@@ -125,14 +200,14 @@ func SendAT(command string, args map[string]interface{}) ([]string, error) {
 							found <- nil
 							return
 						}
-
-						for _, faultStr := range fault {
-							if strings.Contains(response, faultStr) {
-								found <- errors.New("faulty response detected")
-								return
-							}
+					}
+					for _, faultStr := range fault {
+						if strings.Contains(response, faultStr) {
+							found <- errors.New("faulty response detected")
+							return
 						}
 					}
+
 				} else {
 					found <- nil
 					return

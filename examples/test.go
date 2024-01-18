@@ -3,10 +3,12 @@ package main
 import (
 	"fmt"
 
-	at "github.com/sixfab/atcomv2"
+	atcom "github.com/sixfab/atcomv2"
 )
 
 func main() {
+
+	at := atcom.NewAtcom(nil, nil, nil)
 
 	port, err := at.DecidePort()
 
