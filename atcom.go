@@ -195,8 +195,10 @@ func (t *Atcom) SendAT(command string, args map[string]interface{}) ([]string, e
 
 				// check desired and fault existed in response
 				if desired != nil || fault != nil {
+					ok := false
 					for _, desiredStr := range desired {
 						if strings.Contains(response, desiredStr) {
+							ok = true
 							found <- nil
 							return
 						}
@@ -208,6 +210,10 @@ func (t *Atcom) SendAT(command string, args map[string]interface{}) ([]string, e
 						}
 					}
 
+					if !ok {
+						found <- errors.New("desired response not found")
+						return
+					}
 				} else {
 					found <- nil
 					return
