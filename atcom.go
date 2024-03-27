@@ -16,16 +16,16 @@ import (
 )
 
 type Atcom struct {
-	serial Serial
-	shell  Shell
+	serial SerialModel
+	shell  ShellModel
 }
 
 // Serial Implementation for normal usage
-type RealSerial struct {
+type Serial struct {
 }
 
 // Serial interface
-type Serial interface {
+type SerialModel interface {
 	OpenPort(c *serial.Config) (*serial.Port, error)
 	Write(port *serial.Port, command []byte) (n int, err error)
 	Close(port *serial.Port) (err error)
@@ -33,46 +33,46 @@ type Serial interface {
 }
 
 // RealSerial implements Serial interface
-func (s *RealSerial) OpenPort(c *serial.Config) (*serial.Port, error) {
+func (s *Serial) OpenPort(c *serial.Config) (*serial.Port, error) {
 	return serial.OpenPort(c)
 }
 
-func (s *RealSerial) Write(port *serial.Port, command []byte) (n int, err error) {
+func (s *Serial) Write(port *serial.Port, command []byte) (n int, err error) {
 	return port.Write([]byte(command))
 }
 
-func (s *RealSerial) Close(port *serial.Port) (err error) {
+func (s *Serial) Close(port *serial.Port) (err error) {
 	return port.Close()
 }
 
-func (s *RealSerial) Read(port *serial.Port, buffer []byte) (n int, err error) {
+func (s *Serial) Read(port *serial.Port, buffer []byte) (n int, err error) {
 	return port.Read(buffer)
 }
 
 // Shell Implementation for normal usage
-type RealShell struct{}
+type Shell struct{}
 
 // Shell interface
-type Shell interface {
+type ShellModel interface {
 	Command(name string, arg ...string) (string, error)
 }
 
 // RealShell implements Shell interface
-func (s *RealShell) Command(name string, arg ...string) (string, error) {
+func (s *Shell) Command(name string, arg ...string) (string, error) {
 	cmd := exec.Command(name, arg...)
 	output, err := cmd.Output()
 	return string(output), err
 }
 
 // NewAtcom creates a new Atcom instance with default serial and shell implementations
-func NewAtcom(s Serial, sh Shell, sl func(time.Duration)) *Atcom {
+func NewAtcom(s SerialModel, sh ShellModel) *Atcom {
 
 	if s == nil {
-		s = &RealSerial{}
+		s = &Serial{}
 	}
 
 	if sh == nil {
-		sh = &RealShell{}
+		sh = &Shell{}
 	}
 
 	return &Atcom{

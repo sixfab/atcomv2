@@ -61,3 +61,23 @@ func (m *MockSerial) Close(port *serial.Port) error {
 
 	return r0
 }
+
+func (m *MockSerial) Read(port *serial.Port, buffer []byte) (int, error) {
+	ret := m.Called(port, buffer)
+
+	var r0 int
+	if rf, ok := ret.Get(0).(func(*serial.Port, []byte) int); ok {
+		r0 = rf(port, buffer)
+	} else {
+		r0 = ret.Get(0).(int)
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(*serial.Port, []byte) error); ok {
+		r1 = rf(port, buffer)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
