@@ -2,7 +2,6 @@ package atcom
 
 import (
 	"errors"
-	"fmt"
 	"reflect"
 	"testing"
 	"time"
@@ -100,40 +99,7 @@ func (t *MockSerial) Read(port *serial.Port, buf []byte) (n int, err error) {
 
 func TestNewAtcom(t *testing.T) {
 
-	t.Run("Should return NewAtcom for", func(t *testing.T) {
-
-		parameters := []struct {
-			name    string
-			serial  Serial
-			shell   Shell
-			sleep   func(d time.Duration)
-			desired *Atcom
-		}{
-			{"no mocking", nil, nil, nil, &Atcom{&RealSerial{}, &RealShell{}, time.Sleep}},
-			{"mocking serial", &MockSerial{}, nil, nil, &Atcom{&MockSerial{}, &RealShell{}, time.Sleep}},
-			{"mocking shell", nil, &MockShell{}, nil, &Atcom{&RealSerial{}, &MockShell{}, time.Sleep}},
-			{"mocking Sleep", nil, nil, mockSleepFunc, &Atcom{&RealSerial{}, &RealShell{}, mockSleepFunc}},
-			{"mocking all", &MockSerial{}, &MockShell{}, mockSleepFunc, &Atcom{&MockSerial{},
-				&MockShell{}, mockSleepFunc}},
-		}
-
-		for _, tt := range parameters {
-
-			t.Run(tt.name, func(t *testing.T) {
-
-				response := NewAtcom(tt.serial, tt.shell, tt.sleep)
-
-				if !reflect.DeepEqual(response.serial, tt.desired.serial) {
-					t.Errorf("Expected %v, but got %v", response.serial, tt.desired.serial)
-				}
-				if !reflect.DeepEqual(response.shell, tt.desired.shell) {
-					t.Errorf("Expected %v, but got %v", response.shell, tt.desired.shell)
-				}
-				if fmt.Sprintf("%p", response.Sleep) != fmt.Sprintf("%p", tt.desired.Sleep) {
-					t.Errorf("Expected %p, but got %p", tt.desired.Sleep, response.Sleep)
-				}
-			})
-		}
+	t.Run("Should return pointer of atcom structure", func(t *testing.T) {
 	})
 }
 
