@@ -15,14 +15,27 @@ import (
 	"github.com/tarm/serial"
 )
 
+type SerialAttr struct {
+	Port string
+	Baud int
+}
+
+func DefaultSerialAttr() SerialAttr {
+	return SerialAttr{
+		Port: "",
+		Baud: 115200,
+	}
+}
+
 type Atcom struct {
 	serial SerialModel
 	shell  ShellModel
+
+	SerialAttr SerialAttr
 }
 
 // Serial Implementation for normal usage
-type Serial struct {
-}
+type Serial struct{}
 
 // Serial interface
 type SerialModel interface {
@@ -32,7 +45,7 @@ type SerialModel interface {
 	Read(port *serial.Port, buffer []byte) (n int, err error)
 }
 
-// RealSerial implements Serial interface
+// Serial implements Serial interface
 func (s *Serial) OpenPort(c *serial.Config) (*serial.Port, error) {
 	return serial.OpenPort(c)
 }
@@ -82,18 +95,13 @@ func NewAtcom(s SerialModel, sh ShellModel) *Atcom {
 }
 
 // Function to open serial port
-func (t *Atcom) open(args map[string]interface{}) (port *serial.Port, err error) {
+func (t *Atcom) open() (port *serial.Port, err error) {
 
-	portname := "/dev/ttyUSB2"
-	baudrate := 115200
+	portname := t.SerialAttr.Port
+	baudrate := t.SerialAttr.Baud
 
-	for key, value := range args {
-		switch key {
-		case "port":
-			portname = value.(string)
-		case "baud":
-			baudrate = value.(int)
-		}
+	if portname == "" {
+		return nil, errors.New("serialport is required")
 	}
 
 	config := &serial.Config{
@@ -106,30 +114,19 @@ func (t *Atcom) open(args map[string]interface{}) (port *serial.Port, err error)
 }
 
 // SendAT sends AT command to modem and returns response
-func (t *Atcom) SendAT(command string, args map[string]interface{}) ([]string, error) {
+func (t *Atcom) SendAT(c *ATCommand) *ATCommand {
 
-	var lineEnd bool = true
-	var desired []string = nil
-	var fault []string = nil
-	var timeout int = 5
+	command := c.Command
+	lineEnd := c.LineEnd
+	timeout := c.Timeout
+	desired := c.Desired
+	fault := c.Fault
 
-	for key, value := range args {
-		switch key {
-		case "desired":
-			desired = value.([]string)
-		case "fault":
-			fault = value.([]string)
-		case "timeout":
-			timeout = value.(int)
-		case "lineEnd":
-			lineEnd = value.(bool)
-		}
-	}
-
-	serialPort, err := t.open(args)
+	serialPort, err := t.open()
 
 	if err != nil {
-		return nil, err
+		c.Error = err
+		return c
 	}
 
 	defer t.serial.Close(serialPort)
@@ -140,7 +137,8 @@ func (t *Atcom) SendAT(command string, args map[string]interface{}) ([]string, e
 
 	_, err = t.serial.Write(serialPort, []byte(command))
 	if err != nil {
-		return nil, err
+		c.Error = err
+		return c
 	}
 
 	data := make([]string, 0)
@@ -163,6 +161,12 @@ func (t *Atcom) SendAT(command string, args map[string]interface{}) ([]string, e
 				if err.Error() == "EOF" {
 					continue
 				}
+
+				// check if channel is closed
+				if found == nil {
+					return
+				}
+
 				found <- err
 				return
 			}
@@ -227,10 +231,14 @@ func (t *Atcom) SendAT(command string, args map[string]interface{}) ([]string, e
 	for {
 		select {
 		case err := <-found:
-			return data, err
+			c.Response = data
+			c.Error = err
+			return c
 		case <-timeoutCh:
 			cancelScan()
-			return data, errors.New("timeout")
+			c.Response = data
+			c.Error = errors.New("timeout")
+			return c
 		}
 	}
 }

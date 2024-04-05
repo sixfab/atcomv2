@@ -31,6 +31,8 @@ var detectCmd = &cobra.Command{
 		vidFlag := cmd.Flag("vid").Value.String()
 		pidFlag := cmd.Flag("pid").Value.String()
 		portFlag := cmd.Flag("port").Value.String()
+		vendorFlag := cmd.Flag("vendor").Value.String()
+		modelFlag := cmd.Flag("model").Value.String()
 
 		at := atcom.NewAtcom(nil, nil)
 
@@ -47,18 +49,27 @@ var detectCmd = &cobra.Command{
 		}
 
 		if vidFlag == "true" {
-			fmt.Println(modem["vendor_id"])
+			fmt.Println(modem["vid"])
 		}
 
 		if pidFlag == "true" {
-			fmt.Println(modem["product_id"])
+			fmt.Println(modem["pid"])
 		}
 
 		if portFlag == "true" {
 			fmt.Println(modem["port"])
 		}
 
-		if allFlag == "false" && vidFlag == "false" && pidFlag == "false" && portFlag == "false" {
+		if vendorFlag == "true" {
+			fmt.Println(modem["vendor"])
+		}
+
+		if modelFlag == "true" {
+			fmt.Println(modem["model"])
+		}
+
+		if allFlag == "false" && vidFlag == "false" && pidFlag == "false" &&
+			vendorFlag == "false" && modelFlag == "false" {
 			fmt.Println(modem["port"])
 		}
 	},
@@ -103,21 +114,34 @@ var rootCmd = &cobra.Command{
 			faultSlice = nil
 		}
 
-		// prepare command arguments
-		comArgs := map[string]interface{}{
-			"port":    port,
-			"baud":    baudInt,
-			"desired": desiredSlice,
-			"fault":   faultSlice,
-			"timeout": timeoutInt,
-			"lineEnd": lineendBool,
+		at := atcom.NewAtcom(nil, nil)
+
+		if port == "" {
+			_, err := at.DecidePort()
+
+			if err != nil {
+				fmt.Println(err)
+				os.Exit(1)
+			}
+		} else {
+			// set port and baudrate on atcom instance
+			at.SerialAttr.Port = port
+			at.SerialAttr.Baud = baudInt
 		}
 
 		// if verbose mode is true, print parameters
 		if verbose == "true" {
 			fmt.Println("--------------------------------------")
+			fmt.Println("Parameters")
+			fmt.Println("--------------------------------------")
 			fmt.Println("Command: ", command)
-			fmt.Println("Port: ", port)
+
+			if port == "" {
+				fmt.Println("Port: ", at.SerialAttr.Port, " (auto detected)")
+			} else {
+				fmt.Println("Port: ", port)
+			}
+
 			fmt.Println("Baud: ", baud)
 			fmt.Println("Desired: ", desiredSlice)
 			fmt.Println("Fault: ", faultSlice)
@@ -127,16 +151,21 @@ var rootCmd = &cobra.Command{
 			fmt.Println("")
 		}
 
-		at := atcom.NewAtcom(nil, nil)
+		// create new AT command
+		com := atcom.NewATCommand(command)
+		com.LineEnd = lineendBool
+		com.Timeout = timeoutInt
+		com.Desired = desiredSlice
+		com.Fault = faultSlice
 
-		response, err := at.SendAT(command, comArgs)
+		com = at.SendAT(com)
 
-		if err != nil {
-			fmt.Println(err)
+		if com.Error != nil {
+			fmt.Println(com.Error)
 			os.Exit(1)
 		}
 
-		for _, res := range response {
+		for _, res := range com.Response {
 			fmt.Println(res)
 		}
 	},
@@ -160,7 +189,7 @@ func init() {
 
 	// Cobra also supports local flags, which will only run
 	// when this action is called directly.
-	rootCmd.Flags().StringP("port", "p", "/dev/ttyUSB2", "port name")
+	rootCmd.Flags().StringP("port", "p", "", "port name")
 	rootCmd.Flags().IntP("baud", "b", 115200, "baud rate")
 	rootCmd.Flags().StringP("desired", "d", "", "desired responses - separate your multiple words with /")
 	rootCmd.Flags().StringP("fault", "f", "", "fault responses - separate your multiple words with /")
@@ -176,4 +205,6 @@ func init() {
 	detectCmd.Flags().BoolP("vid", "v", false, "vendor id")
 	detectCmd.Flags().BoolP("pid", "i", false, "product id")
 	detectCmd.Flags().BoolP("port", "p", false, "serial port")
+	detectCmd.Flags().BoolP("vendor", "e", false, "vendor name")
+	detectCmd.Flags().BoolP("model", "m", false, "model name")
 }
