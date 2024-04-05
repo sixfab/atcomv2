@@ -1,3 +1,3 @@
 package atcom
 
-const Version = "0.4.2"
+const Version = "v0.5.0"

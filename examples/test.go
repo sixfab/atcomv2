@@ -8,28 +8,30 @@ import (
 
 func main() {
 
-	at := atcom.NewAtcom(nil, nil, nil)
+	at := atcom.NewAtcom(nil, nil)
 
-	port, err := at.DecidePort()
+	_, err := at.DecidePort()
 
 	if err != nil {
 		fmt.Println(err)
+		return
 	}
 
-	args := map[string]interface{}{
-		"port":    port["port"],
-		"baud":    115200,
-		"lineEnd": true,
-		"timeout": 5,
+	com := atcom.NewATCommand("AT+CGDCONT?")
+	com.Desired = []string{"super"}
+	com = at.SendAT(com)
+	com.GetMeaningfulPart("+CGDCONT: ")
+
+	if com.Error != nil {
+		fmt.Println(com.Error)
 	}
 
-	response, err := at.SendAT("ATE1", args)
-	fmt.Println(response, err)
-
-	response2, err := at.SendAT("AT+COPS?", args)
-	fmt.Println(response2, err)
-
-	args["desired"] = []string{"internet"}
-	response1, err := at.SendAT("AT+CGDCONT?", args)
-	fmt.Println(response1, err)
+	fmt.Println("Command: ", com.Command)
+	fmt.Println("Response: ", com.Response)
+	fmt.Println("Processed: ", com.Processed)
+	fmt.Println("Error: ", com.Error)
+	fmt.Println("Desired: ", com.Desired)
+	fmt.Println("Fault: ", com.Fault)
+	fmt.Println("Timeout: ", com.Timeout)
+	fmt.Println("LineEnd: ", com.LineEnd)
 }

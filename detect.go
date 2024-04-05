@@ -93,10 +93,17 @@ func (t *Atcom) DecidePort() (map[string]string, error) {
 		return nil, err
 	}
 
+	attr := DefaultSerialAttr()
+
 	for _, port := range ports {
 		if port["vendor_id"] == modem.vid &&
 			port["product_id"] == modem.pid &&
 			port["interface"] == modem.ifs {
+
+			// set port and baudrate on atcom instance
+			attr.Port = port["port"]
+			t.SerialAttr.Port = attr.Port
+			t.SerialAttr.Baud = attr.Baud
 
 			detectedModem := map[string]string{
 				"port":   port["port"],

@@ -15,91 +15,93 @@ import (
 	"github.com/tarm/serial"
 )
 
+type SerialAttr struct {
+	Port string
+	Baud int
+}
+
+func DefaultSerialAttr() SerialAttr {
+	return SerialAttr{
+		Port: "",
+		Baud: 115200,
+	}
+}
+
 type Atcom struct {
-	serial Serial
-	shell  Shell
-	Sleep  func(d time.Duration)
+	serial SerialModel
+	shell  ShellModel
+
+	SerialAttr SerialAttr
 }
 
 // Serial Implementation for normal usage
-type RealSerial struct {
-}
+type Serial struct{}
 
 // Serial interface
-type Serial interface {
+type SerialModel interface {
 	OpenPort(c *serial.Config) (*serial.Port, error)
 	Write(port *serial.Port, command []byte) (n int, err error)
 	Close(port *serial.Port) (err error)
 	Read(port *serial.Port, buffer []byte) (n int, err error)
 }
 
-// RealSerial implements Serial interface
-func (s *RealSerial) OpenPort(c *serial.Config) (*serial.Port, error) {
+// Serial implements Serial interface
+func (s *Serial) OpenPort(c *serial.Config) (*serial.Port, error) {
 	return serial.OpenPort(c)
 }
 
-func (s *RealSerial) Write(port *serial.Port, command []byte) (n int, err error) {
+func (s *Serial) Write(port *serial.Port, command []byte) (n int, err error) {
 	return port.Write([]byte(command))
 }
 
-func (s *RealSerial) Close(port *serial.Port) (err error) {
+func (s *Serial) Close(port *serial.Port) (err error) {
 	return port.Close()
 }
 
-func (s *RealSerial) Read(port *serial.Port, buffer []byte) (n int, err error) {
+func (s *Serial) Read(port *serial.Port, buffer []byte) (n int, err error) {
 	return port.Read(buffer)
 }
 
 // Shell Implementation for normal usage
-type RealShell struct{}
+type Shell struct{}
 
 // Shell interface
-type Shell interface {
+type ShellModel interface {
 	Command(name string, arg ...string) (string, error)
 }
 
 // RealShell implements Shell interface
-func (s *RealShell) Command(name string, arg ...string) (string, error) {
+func (s *Shell) Command(name string, arg ...string) (string, error) {
 	cmd := exec.Command(name, arg...)
 	output, err := cmd.Output()
 	return string(output), err
 }
 
 // NewAtcom creates a new Atcom instance with default serial and shell implementations
-func NewAtcom(s Serial, sh Shell, sl func(time.Duration)) *Atcom {
+func NewAtcom(s SerialModel, sh ShellModel) *Atcom {
 
 	if s == nil {
-		s = &RealSerial{}
+		s = &Serial{}
 	}
 
 	if sh == nil {
-		sh = &RealShell{}
-	}
-
-	if sl == nil {
-		sl = time.Sleep
+		sh = &Shell{}
 	}
 
 	return &Atcom{
 		serial: s,
 		shell:  sh,
-		Sleep:  sl,
 	}
 }
 
 // Function to open serial port
-func (t *Atcom) open(args map[string]interface{}) (port *serial.Port, err error) {
+func (t *Atcom) open() (port *serial.Port, err error) {
 
-	portname := "/dev/ttyUSB2"
-	baudrate := 115200
+	portname := t.SerialAttr.Port
+	baudrate := t.SerialAttr.Baud
 
-	for key, value := range args {
-		switch key {
-		case "port":
-			portname = value.(string)
-		case "baud":
-			baudrate = value.(int)
-		}
+	if portname == "" {
+		return nil, errors.New("serialport is required")
 	}
 
 	config := &serial.Config{
@@ -112,30 +114,19 @@ func (t *Atcom) open(args map[string]interface{}) (port *serial.Port, err error)
 }
 
 // SendAT sends AT command to modem and returns response
-func (t *Atcom) SendAT(command string, args map[string]interface{}) ([]string, error) {
+func (t *Atcom) SendAT(c *ATCommand) *ATCommand {
 
-	var lineEnd bool = true
-	var desired []string = nil
-	var fault []string = nil
-	var timeout int = 5
+	command := c.Command
+	lineEnd := c.LineEnd
+	timeout := c.Timeout
+	desired := c.Desired
+	fault := c.Fault
 
-	for key, value := range args {
-		switch key {
-		case "desired":
-			desired = value.([]string)
-		case "fault":
-			fault = value.([]string)
-		case "timeout":
-			timeout = value.(int)
-		case "lineEnd":
-			lineEnd = value.(bool)
-		}
-	}
-
-	serialPort, err := t.open(args)
+	serialPort, err := t.open()
 
 	if err != nil {
-		return nil, err
+		c.Error = err
+		return c
 	}
 
 	defer t.serial.Close(serialPort)
@@ -146,7 +137,8 @@ func (t *Atcom) SendAT(command string, args map[string]interface{}) ([]string, e
 
 	_, err = t.serial.Write(serialPort, []byte(command))
 	if err != nil {
-		return nil, err
+		c.Error = err
+		return c
 	}
 
 	data := make([]string, 0)
@@ -163,12 +155,18 @@ func (t *Atcom) SendAT(command string, args map[string]interface{}) ([]string, e
 		buf := make([]byte, 1024)
 
 		for {
-			t.Sleep(time.Millisecond * 5)
+			time.Sleep(time.Millisecond * 5)
 			n, err := t.serial.Read(serialPort, buf)
 			if err != nil {
 				if err.Error() == "EOF" {
 					continue
 				}
+
+				// check if channel is closed
+				if found == nil {
+					return
+				}
+
 				found <- err
 				return
 			}
@@ -233,10 +231,14 @@ func (t *Atcom) SendAT(command string, args map[string]interface{}) ([]string, e
 	for {
 		select {
 		case err := <-found:
-			return data, err
+			c.Response = data
+			c.Error = err
+			return c
 		case <-timeoutCh:
 			cancelScan()
-			return data, errors.New("timeout")
+			c.Response = data
+			c.Error = errors.New("timeout")
+			return c
 		}
 	}
 }
