@@ -19,7 +19,6 @@ func main() {
 
 	com := atcom.NewATCommand("AT+CGSN")
 	com.SerialAttr.Port = detected["port"]
-	com.SerialAttr.Baud = 115200
 	com = at.SendAT(com)
 	com.GetMeaningfulPart("")
 
