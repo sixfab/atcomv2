@@ -5,7 +5,21 @@ import (
 	"strings"
 )
 
+type SerialAttr struct {
+	Port string
+	Baud int
+}
+
+func DefaultSerialAttr() SerialAttr {
+	return SerialAttr{
+		Port: "",
+		Baud: 115200,
+	}
+}
+
 type ATCommand struct {
+	SerialAttr SerialAttr
+
 	Command   string
 	Response  []string
 	Processed []string
@@ -19,11 +33,12 @@ type ATCommand struct {
 
 func NewATCommand(command string) *ATCommand {
 	return &ATCommand{
-		Command: command,
-		Desired: nil,
-		Fault:   nil,
-		Timeout: 5,
-		LineEnd: true,
+		SerialAttr: DefaultSerialAttr(),
+		Command:    command,
+		Desired:    nil,
+		Fault:      nil,
+		Timeout:    5,
+		LineEnd:    true,
 	}
 }
 

@@ -117,16 +117,14 @@ var rootCmd = &cobra.Command{
 		at := atcom.NewAtcom(nil, nil)
 
 		if port == "" {
-			_, err := at.DecidePort()
+			detected, err := at.DecidePort()
 
 			if err != nil {
 				fmt.Println(err)
 				os.Exit(1)
 			}
-		} else {
-			// set port and baudrate on atcom instance
-			at.SerialAttr.Port = port
-			at.SerialAttr.Baud = baudInt
+
+			port = detected["port"]
 		}
 
 		// if verbose mode is true, print parameters
@@ -135,13 +133,7 @@ var rootCmd = &cobra.Command{
 			fmt.Println("Parameters")
 			fmt.Println("--------------------------------------")
 			fmt.Println("Command: ", command)
-
-			if port == "" {
-				fmt.Println("Port: ", at.SerialAttr.Port, " (auto detected)")
-			} else {
-				fmt.Println("Port: ", port)
-			}
-
+			fmt.Println("Port: ", port)
 			fmt.Println("Baud: ", baud)
 			fmt.Println("Desired: ", desiredSlice)
 			fmt.Println("Fault: ", faultSlice)
@@ -153,6 +145,8 @@ var rootCmd = &cobra.Command{
 
 		// create new AT command
 		com := atcom.NewATCommand(command)
+		com.SerialAttr.Port = port
+		com.SerialAttr.Baud = baudInt
 		com.LineEnd = lineendBool
 		com.Timeout = timeoutInt
 		com.Desired = desiredSlice

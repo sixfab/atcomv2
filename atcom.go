@@ -15,23 +15,9 @@ import (
 	"github.com/tarm/serial"
 )
 
-type SerialAttr struct {
-	Port string
-	Baud int
-}
-
-func DefaultSerialAttr() SerialAttr {
-	return SerialAttr{
-		Port: "",
-		Baud: 115200,
-	}
-}
-
 type Atcom struct {
 	serial SerialModel
 	shell  ShellModel
-
-	SerialAttr SerialAttr
 }
 
 // Serial Implementation for normal usage
@@ -95,10 +81,11 @@ func NewAtcom(s SerialModel, sh ShellModel) *Atcom {
 }
 
 // Function to open serial port
-func (t *Atcom) open() (port *serial.Port, err error) {
+func (t *Atcom) open(portname string, baudrate int) (port *serial.Port, err error) {
 
-	portname := t.SerialAttr.Port
-	baudrate := t.SerialAttr.Baud
+	if baudrate == 0 {
+		baudrate = 115200
+	}
 
 	if portname == "" {
 		return nil, errors.New("serialport is required")
@@ -121,8 +108,10 @@ func (t *Atcom) SendAT(c *ATCommand) *ATCommand {
 	timeout := c.Timeout
 	desired := c.Desired
 	fault := c.Fault
+	portname := c.SerialAttr.Port
+	baudrate := c.SerialAttr.Baud
 
-	serialPort, err := t.open()
+	serialPort, err := t.open(portname, baudrate)
 
 	if err != nil {
 		c.Error = err
