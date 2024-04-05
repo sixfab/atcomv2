@@ -10,17 +10,18 @@ func main() {
 
 	at := atcom.NewAtcom(nil, nil)
 
-	_, err := at.DecidePort()
+	detected, err := at.DecidePort()
 
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
 
-	com := atcom.NewATCommand("AT+CGDCONT?")
-	com.Desired = []string{"super"}
+	com := atcom.NewATCommand("AT+CGSN")
+	com.SerialAttr.Port = detected["port"]
+	com.SerialAttr.Baud = 115200
 	com = at.SendAT(com)
-	com.GetMeaningfulPart("+CGDCONT: ")
+	com.GetMeaningfulPart("")
 
 	if com.Error != nil {
 		fmt.Println(com.Error)

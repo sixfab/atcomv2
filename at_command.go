@@ -48,11 +48,6 @@ func (atc *ATCommand) GetMeaningfulPart(prefix string) error {
 		return fmt.Errorf("no response")
 	}
 
-	if prefix == "" {
-		atc.Processed = atc.Response
-		return nil
-	}
-
 	var echoRow int = 0
 	var lastRow int = 0
 	var data []string
