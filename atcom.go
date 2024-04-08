@@ -134,7 +134,6 @@ func (t *Atcom) SendAT(c *ATCommand) *ATCommand {
 	timeoutDuration := time.Duration(timeout) * time.Second
 
 	found := make(chan error)
-	defer close(found)
 
 	ctxScan, cancelScan := context.WithCancel(context.Background())
 	defer cancelScan()
@@ -144,73 +143,74 @@ func (t *Atcom) SendAT(c *ATCommand) *ATCommand {
 		buf := make([]byte, 1024)
 
 		for {
-			time.Sleep(time.Millisecond * 5)
-			n, err := t.serial.Read(serialPort, buf)
-			if err != nil {
-				if err.Error() == "EOF" {
-					continue
-				}
+			select {
+			case <-ctx.Done():
+				close(found)
+				return
+			default:
+				time.Sleep(time.Millisecond * 5)
+				n, err := t.serial.Read(serialPort, buf)
+				if err != nil {
+					if err.Error() == "EOF" {
+						continue
+					}
 
-				// check if channel is closed
-				if found == nil {
+					found <- err
 					return
 				}
-
-				found <- err
-				return
-			}
-			if n > 0 {
-				response += string(buf[:n])
-			}
-
-			if strings.Contains(response, "\r\nOK\r\n") {
-				lines := strings.Split(response, "\r\n")
-
-				for _, line := range lines {
-					line = strings.TrimSpace(line)
-					line = strings.Trim(line, "\r")
-					line = strings.Trim(line, "\n")
-
-					if line != "" {
-						data = append(data, line)
-					}
-
-					if line == "OK" {
-						break
-					}
+				if n > 0 {
+					response += string(buf[:n])
 				}
 
-				// check desired and fault existed in response
-				if desired != nil || fault != nil {
-					ok := false
-					for _, desiredStr := range desired {
-						if strings.Contains(response, desiredStr) {
-							ok = true
-							found <- nil
-							return
+				if strings.Contains(response, "\r\nOK\r\n") {
+					lines := strings.Split(response, "\r\n")
+
+					for _, line := range lines {
+						line = strings.TrimSpace(line)
+						line = strings.Trim(line, "\r")
+						line = strings.Trim(line, "\n")
+
+						if line != "" {
+							data = append(data, line)
 						}
-					}
-					for _, faultStr := range fault {
-						if strings.Contains(response, faultStr) {
-							found <- errors.New("faulty response detected")
-							return
+
+						if line == "OK" {
+							break
 						}
 					}
 
-					if !ok {
-						found <- errors.New("desired response not found")
+					// check desired and fault existed in response
+					if desired != nil || fault != nil {
+						ok := false
+						for _, desiredStr := range desired {
+							if strings.Contains(response, desiredStr) {
+								ok = true
+								found <- nil
+								return
+							}
+						}
+						for _, faultStr := range fault {
+							if strings.Contains(response, faultStr) {
+								found <- errors.New("faulty response detected")
+								return
+							}
+						}
+
+						if !ok {
+							found <- errors.New("desired response not found")
+							return
+						}
+					} else {
+						found <- nil
 						return
 					}
-				} else {
+
 					found <- nil
 					return
+				} else if strings.Contains(response, "\r\nERROR\r\n") {
+					found <- errors.New("modem error")
+					return
 				}
-
-				found <- nil
-				return
-			} else if strings.Contains(response, "\r\nERROR\r\n") {
-				found <- errors.New("modem error")
-				return
 			}
 		}
 	}(ctxScan)
