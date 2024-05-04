@@ -48,18 +48,29 @@ func (atc *ATCommand) GetMeaningfulPart(prefix string) error {
 		return fmt.Errorf("no response")
 	}
 
-	var echoRow int = 0
+	var firstRow int = 0
 	var lastRow int = 0
 	var data []string
 
+	// decide start and end of meaningful part of response
 	for index, line := range atc.Response {
 		line = strings.TrimSpace(line)
 
+		// decide echo line if exists
 		if strings.HasPrefix(line, atc.Command) {
-			echoRow = index
+			firstRow = index + 1
 			continue
 		}
 
+		// skip modem +X lines when prefix is empty
+		if prefix == "" {
+			if strings.HasPrefix(line, "+") {
+				firstRow++
+				continue
+			}
+		}
+
+		// decide last line of response
 		if line == "OK" {
 			lastRow = index
 			break
@@ -71,9 +82,9 @@ func (atc *ATCommand) GetMeaningfulPart(prefix string) error {
 	}
 
 	if prefix == "" {
-		data = atc.Response[echoRow+1 : lastRow]
+		data = atc.Response[firstRow:lastRow]
 	} else {
-		for _, line := range atc.Response[echoRow+1 : lastRow] {
+		for _, line := range atc.Response[firstRow:lastRow] {
 			if strings.HasPrefix(line, prefix) {
 				line = strings.Trim(line, prefix)
 				data = append(data, line)
