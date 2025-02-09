@@ -173,9 +173,13 @@ func (t *Atcom) SendAT(c *ATCommand) *ATCommand {
 						line = strings.Trim(line, "\r")
 						line = strings.Trim(line, "\n")
 
+						if strings.Contains(line, "ERROR") {
+							found <- errors.New(line)
+							break
+						}
+
 						if line != "" {
 							data = append(data, line)
-
 							c.ResponseChan <- line
 						}
 					}
