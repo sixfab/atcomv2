@@ -20,10 +20,11 @@ func DefaultSerialAttr() SerialAttr {
 type ATCommand struct {
 	SerialAttr SerialAttr
 
-	Command   string
-	Response  []string
-	Processed []string
-	Error     error
+	Command      string
+	Response     []string
+	Processed    []string
+	Error        error
+	ResponseChan chan string
 
 	Desired []string
 	Fault   []string
@@ -33,12 +34,13 @@ type ATCommand struct {
 
 func NewATCommand(command string) *ATCommand {
 	return &ATCommand{
-		SerialAttr: DefaultSerialAttr(),
-		Command:    command,
-		Desired:    nil,
-		Fault:      nil,
-		Timeout:    5,
-		LineEnd:    true,
+		SerialAttr:   DefaultSerialAttr(),
+		Command:      command,
+		Desired:      nil,
+		Fault:        nil,
+		Timeout:      5,
+		LineEnd:      true,
+		ResponseChan: nil,
 	}
 }
 

@@ -110,6 +110,7 @@ func (t *Atcom) SendAT(c *ATCommand) *ATCommand {
 	fault := c.Fault
 	portname := c.SerialAttr.Port
 	baudrate := c.SerialAttr.Baud
+	responseChan := c.ResponseChan
 
 	serialPort, err := t.open(portname, baudrate)
 
@@ -158,6 +159,30 @@ func (t *Atcom) SendAT(c *ATCommand) *ATCommand {
 					found <- err
 					return
 				}
+
+				// Send real-time responses through the channel if ResponseChan is set
+				if responseChan != nil {
+					if n > 0 {
+						response = string(buf[:n])
+					}
+
+					lines := strings.Split(response, "\r\n")
+
+					for _, line := range lines {
+						line = strings.TrimSpace(line)
+						line = strings.Trim(line, "\r")
+						line = strings.Trim(line, "\n")
+
+						if line != "" {
+							data = append(data, line)
+
+							c.ResponseChan <- line
+						}
+					}
+					// Read responses continuously until timeout is reached
+					continue
+				}
+
 				if n > 0 {
 					response += string(buf[:n])
 				}
@@ -226,7 +251,9 @@ func (t *Atcom) SendAT(c *ATCommand) *ATCommand {
 		case <-timeoutCh:
 			cancelScan()
 			c.Response = data
-			c.Error = errors.New("timeout")
+			if c.ResponseChan == nil {
+				c.Error = errors.New("timeout")
+			}
 			return c
 		}
 	}
