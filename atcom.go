@@ -100,6 +100,56 @@ func (t *Atcom) open(portname string, baudrate int) (port *serial.Port, err erro
 	return t.serial.OpenPort(config)
 }
 
+// Function to read serial port
+func (t *Atcom) ReadResponse(c *ATCommand) error {
+	timeout := c.Timeout
+	portname := c.SerialAttr.Port
+	baudrate := c.SerialAttr.Baud
+	responseChan := c.ResponseChan
+
+	serialPort, err := t.open(portname, baudrate)
+	if err != nil {
+		return err
+	}
+	defer t.serial.Close(serialPort)
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Second)
+	defer cancel()
+
+	done := make(chan error, 1)
+
+	go func() {
+		buf := make([]byte, 1024)
+		for {
+			select {
+			case <-ctx.Done():
+				done <- nil
+				return
+			default:
+				n, err := t.serial.Read(serialPort, buf)
+				if err != nil {
+					if err.Error() == "EOF" {
+						continue
+					}
+					done <- err
+					return
+				}
+				if n > 0 {
+					response := string(buf[:n])
+					responseChan <- response
+				}
+			}
+		}
+	}()
+
+	select {
+	case err := <-done:
+		return err
+	case <-ctx.Done():
+		return nil
+	}
+}
+
 // SendAT sends AT command to modem and returns response
 func (t *Atcom) SendAT(c *ATCommand) *ATCommand {
 
