@@ -173,14 +173,19 @@ func (t *Atcom) SendAT(c *ATCommand) *ATCommand {
 						line = strings.Trim(line, "\r")
 						line = strings.Trim(line, "\n")
 
+						if line != "" {
+							data = append(data, line)
+							c.ResponseChan <- line
+						}
+
 						if strings.Contains(line, "ERROR") {
 							found <- errors.New(line)
 							break
 						}
 
-						if line != "" {
-							data = append(data, line)
-							c.ResponseChan <- line
+						if strings.Contains(line, "OK") {
+							found <- nil
+							break
 						}
 					}
 					// Read responses continuously until timeout is reached
