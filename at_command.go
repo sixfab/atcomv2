@@ -25,6 +25,7 @@ type ATCommand struct {
 	Processed    []string
 	Error        error
 	ResponseChan chan string
+	Urc          bool
 
 	Desired []string
 	Fault   []string
@@ -41,6 +42,7 @@ func NewATCommand(command string) *ATCommand {
 		Timeout:      5,
 		LineEnd:      true,
 		ResponseChan: nil,
+		Urc:          false,
 	}
 }
 

@@ -111,6 +111,7 @@ func (t *Atcom) SendAT(c *ATCommand) *ATCommand {
 	portname := c.SerialAttr.Port
 	baudrate := c.SerialAttr.Baud
 	responseChan := c.ResponseChan
+	urc := c.Urc
 
 	serialPort, err := t.open(portname, baudrate)
 
@@ -125,7 +126,10 @@ func (t *Atcom) SendAT(c *ATCommand) *ATCommand {
 		command += "\r\n"
 	}
 
-	_, err = t.serial.Write(serialPort, []byte(command))
+	if !urc {
+		_, err = t.serial.Write(serialPort, []byte(command))
+	}
+
 	if err != nil {
 		c.Error = err
 		return c
