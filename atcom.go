@@ -187,6 +187,23 @@ func (t *Atcom) SendAT(c *ATCommand) *ATCommand {
 							found <- nil
 							break
 						}
+
+						// check desired and fault existed in response
+						if desired != nil || fault != nil {
+							for _, desiredStr := range desired {
+								if strings.Contains(line, desiredStr) {
+									found <- nil
+									return
+								}
+							}
+							for _, faultStr := range fault {
+								if strings.Contains(line, faultStr) {
+									found <- errors.New("faulty response detected")
+									return
+								}
+							}
+
+						}
 					}
 					// Read responses continuously until timeout is reached
 					continue
