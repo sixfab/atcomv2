@@ -91,6 +91,7 @@ var rootCmd = &cobra.Command{
 		timeout := cmd.Flag("timeout").Value.String()
 		lineend := cmd.Flag("lineend").Value.String()
 		verbose := cmd.Flag("verbose").Value.String()
+		urc := cmd.Flag("urc").Value.String()
 
 		// convert parameters to suitable format with library
 		baudInt, _ := strconv.Atoi(baud)
@@ -127,8 +128,35 @@ var rootCmd = &cobra.Command{
 			port = detected["port"]
 		}
 
-		// if verbose mode is true, print parameters
-		if verbose == "true" {
+		// If URC (Unsolicited Result Code) mode is enabled, listen for responses
+		// from the channel without sending any command
+		if urc == "true" {
+			responseChan := make(chan string)
+			defer close(responseChan)
+
+			// Start a goroutine to listen and print responses from the channel
+			go func(ch chan string) {
+				for resp := range ch {
+					fmt.Println(resp)
+				}
+			}(responseChan)
+
+			// create new AT command
+			com := atcom.NewATCommand(command)
+			com.SerialAttr.Port = port
+			com.SerialAttr.Baud = baudInt
+			com.LineEnd = lineendBool
+			com.Timeout = timeoutInt
+			com.Desired = desiredSlice
+			com.Fault = faultSlice
+			com.ResponseChan = responseChan
+			com.Urc = true
+
+			_ = at.SendAT(com)
+		} else if verbose == "true" {
+			// If verbose mode is enabled, print parameters and responses until timeout,
+			// desired response, or a standard "OK"/"ERROR" is received
+
 			fmt.Println("--------------------------------------")
 			fmt.Println("Parameters")
 			fmt.Println("--------------------------------------")
@@ -141,26 +169,48 @@ var rootCmd = &cobra.Command{
 			fmt.Println("Verbose: ", verbose)
 			fmt.Println("--------------------------------------")
 			fmt.Println("")
-		}
 
-		// create new AT command
-		com := atcom.NewATCommand(command)
-		com.SerialAttr.Port = port
-		com.SerialAttr.Baud = baudInt
-		com.LineEnd = lineendBool
-		com.Timeout = timeoutInt
-		com.Desired = desiredSlice
-		com.Fault = faultSlice
+			responseChan := make(chan string)
+			defer close(responseChan)
 
-		com = at.SendAT(com)
+			// Start a goroutine to listen and print responses from the channel
+			go func(ch chan string) {
+				for resp := range ch {
+					fmt.Println(resp)
+				}
+			}(responseChan)
 
-		if com.Error != nil {
-			fmt.Println(com.Error)
-			os.Exit(1)
-		}
+			// create new AT command
+			com := atcom.NewATCommand(command)
+			com.SerialAttr.Port = port
+			com.SerialAttr.Baud = baudInt
+			com.LineEnd = lineendBool
+			com.Timeout = timeoutInt
+			com.Desired = desiredSlice
+			com.Fault = faultSlice
+			com.ResponseChan = responseChan
 
-		for _, res := range com.Response {
-			fmt.Println(res)
+			_ = at.SendAT(com)
+		} else {
+			// create new AT command
+			com := atcom.NewATCommand(command)
+			com.SerialAttr.Port = port
+			com.SerialAttr.Baud = baudInt
+			com.LineEnd = lineendBool
+			com.Timeout = timeoutInt
+			com.Desired = desiredSlice
+			com.Fault = faultSlice
+
+			com = at.SendAT(com)
+
+			if com.Error != nil {
+				fmt.Println(com.Error)
+				os.Exit(1)
+			}
+
+			for _, res := range com.Response {
+				fmt.Println(res)
+			}
 		}
 	},
 }
@@ -190,6 +240,7 @@ func init() {
 	rootCmd.Flags().IntP("timeout", "t", 5, "timeout duration in seconds")
 	rootCmd.Flags().BoolP("lineend", "l", true, "line end")
 	rootCmd.Flags().BoolP("verbose", "v", false, "verbose mode")
+	rootCmd.Flags().BoolP("urc", "u", false, "unsolicited response code")
 	rootCmd.Flags().StringP("version", "V", "", "version")
 
 	rootCmd.AddCommand(versionCmd)
