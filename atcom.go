@@ -126,6 +126,7 @@ func (t *Atcom) SendAT(c *ATCommand) *ATCommand {
 		command += "\r\n"
 	}
 
+	// If urc is true, do not send command to serial port.
 	if !urc {
 		_, err = t.serial.Write(serialPort, []byte(command))
 	}
@@ -165,6 +166,7 @@ func (t *Atcom) SendAT(c *ATCommand) *ATCommand {
 				}
 
 				// Send real-time responses through the channel if ResponseChan is set
+				// Listen for responses until a timeout occurs or the desired response is received.
 				if responseChan != nil {
 					if n > 0 {
 						response = string(buf[:n])
@@ -209,7 +211,6 @@ func (t *Atcom) SendAT(c *ATCommand) *ATCommand {
 
 						}
 					}
-					// Read responses continuously until timeout is reached
 					continue
 				}
 
