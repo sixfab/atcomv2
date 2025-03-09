@@ -240,7 +240,7 @@ func init() {
 	rootCmd.Flags().IntP("timeout", "t", 5, "timeout duration in seconds")
 	rootCmd.Flags().BoolP("lineend", "l", true, "line end")
 	rootCmd.Flags().BoolP("verbose", "v", false, "verbose mode")
-	rootCmd.Flags().BoolP("urc", "u", false, "unsolicited response code")
+	rootCmd.Flags().BoolP("urc", "u", false, "unsolicited response code - if this flag is set, command will not be sent to modem")
 	rootCmd.Flags().StringP("version", "V", "", "version")
 
 	rootCmd.AddCommand(versionCmd)
