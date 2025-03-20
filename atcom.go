@@ -110,6 +110,8 @@ func (t *Atcom) SendAT(c *ATCommand) *ATCommand {
 	fault := c.Fault
 	portname := c.SerialAttr.Port
 	baudrate := c.SerialAttr.Baud
+	responseChan := c.ResponseChan
+	urc := c.Urc
 
 	serialPort, err := t.open(portname, baudrate)
 
@@ -124,7 +126,11 @@ func (t *Atcom) SendAT(c *ATCommand) *ATCommand {
 		command += "\r\n"
 	}
 
-	_, err = t.serial.Write(serialPort, []byte(command))
+	// If urc is true, do not send command to serial port.
+	if !urc {
+		_, err = t.serial.Write(serialPort, []byte(command))
+	}
+
 	if err != nil {
 		c.Error = err
 		return c
@@ -158,6 +164,56 @@ func (t *Atcom) SendAT(c *ATCommand) *ATCommand {
 					found <- err
 					return
 				}
+
+				// Send real-time responses through the channel if ResponseChan is set
+				// Listen for responses until a timeout occurs or the desired response is received.
+				if responseChan != nil {
+					if n > 0 {
+						response = string(buf[:n])
+					}
+
+					lines := strings.Split(response, "\r\n")
+
+					for _, line := range lines {
+						line = strings.TrimSpace(line)
+						line = strings.Trim(line, "\r")
+						line = strings.Trim(line, "\n")
+
+						if line != "" {
+							data = append(data, line)
+							c.ResponseChan <- line
+						}
+
+						if strings.Contains(line, "ERROR") {
+							found <- errors.New(line)
+							break
+						}
+
+						if strings.Contains(line, "OK") {
+							found <- nil
+							break
+						}
+
+						// check desired and fault existed in response
+						if desired != nil || fault != nil {
+							for _, desiredStr := range desired {
+								if strings.Contains(line, desiredStr) {
+									found <- nil
+									return
+								}
+							}
+							for _, faultStr := range fault {
+								if strings.Contains(line, faultStr) {
+									found <- errors.New("faulty response detected")
+									return
+								}
+							}
+
+						}
+					}
+					continue
+				}
+
 				if n > 0 {
 					response += string(buf[:n])
 				}
@@ -226,7 +282,9 @@ func (t *Atcom) SendAT(c *ATCommand) *ATCommand {
 		case <-timeoutCh:
 			cancelScan()
 			c.Response = data
-			c.Error = errors.New("timeout")
+			if c.ResponseChan == nil {
+				c.Error = errors.New("timeout")
+			}
 			return c
 		}
 	}
