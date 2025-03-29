@@ -75,23 +75,21 @@ var detectCmd = &cobra.Command{
 	},
 }
 
-// rootCmd represents the base command when called without any subcommands
-var rootCmd = &cobra.Command{
-	Use:   "atcomv2cli [AT] [flags]",
-	Short: "AT Command CLI",
-	Long:  `AT Command CLI for communicating cellular modems with AT commands.`,
-	Args:  cobra.MinimumNArgs(1),
+// urcCmd represents the urc command
+// This command is used to listen for responses without sending any command
+// Until the timeout, desired response, or a standard "OK"/"ERROR" is received
+var urcCmd = &cobra.Command{
+	Use:   "urc",
+	Short: "Listen for responses without sending any command",
+	Long:  `Listen for responses without sending any command`,
 	Run: func(cmd *cobra.Command, args []string) {
 
-		command := args[0]
 		port := cmd.Flag("port").Value.String()
 		baud := cmd.Flag("baud").Value.String()
 		desired := cmd.Flag("desired").Value.String()
 		fault := cmd.Flag("fault").Value.String()
 		timeout := cmd.Flag("timeout").Value.String()
 		lineend := cmd.Flag("lineend").Value.String()
-		verbose := cmd.Flag("verbose").Value.String()
-		urc := cmd.Flag("urc").Value.String()
 
 		// convert parameters to suitable format with library
 		baudInt, _ := strconv.Atoi(baud)
@@ -128,34 +126,86 @@ var rootCmd = &cobra.Command{
 			port = detected["port"]
 		}
 
-		// If URC (Unsolicited Result Code) mode is enabled, listen for responses
-		// from the channel without sending any command
-		if urc == "true" {
-			responseChan := make(chan string)
-			defer close(responseChan)
+		responseChan := make(chan string)
+		defer close(responseChan)
 
-			// Start a goroutine to listen and print responses from the channel
-			go func(ch chan string) {
-				for resp := range ch {
-					fmt.Println(resp)
-				}
-			}(responseChan)
+		// Start a goroutine to listen and print responses from the channel
+		go func(ch chan string) {
+			for resp := range ch {
+				fmt.Println(resp)
+			}
+		}(responseChan)
 
-			// create new AT command
-			com := atcom.NewATCommand(command)
-			com.SerialAttr.Port = port
-			com.SerialAttr.Baud = baudInt
-			com.LineEnd = lineendBool
-			com.Timeout = timeoutInt
-			com.Desired = desiredSlice
-			com.Fault = faultSlice
-			com.ResponseChan = responseChan
-			com.Urc = true
+		// create new AT command
+		com := atcom.NewATCommand("")
+		com.SerialAttr.Port = port
+		com.SerialAttr.Baud = baudInt
+		com.LineEnd = lineendBool
+		com.Timeout = timeoutInt
+		com.Desired = desiredSlice
+		com.Fault = faultSlice
+		com.ResponseChan = responseChan
+		com.Urc = true
 
-			_ = at.SendAT(com)
-		} else if verbose == "true" {
-			// If verbose mode is enabled, print parameters and responses until timeout,
-			// desired response, or a standard "OK"/"ERROR" is received
+		_ = at.SendAT(com)
+	},
+}
+
+// rootCmd represents the base command when called without any subcommands
+var rootCmd = &cobra.Command{
+	Use:   "atcomv2cli [AT] [flags]",
+	Short: "AT Command CLI",
+	Long:  `AT Command CLI for communicating cellular modems with AT commands.`,
+	Args:  cobra.MinimumNArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+
+		command := args[0]
+		port := cmd.Flag("port").Value.String()
+		baud := cmd.Flag("baud").Value.String()
+		desired := cmd.Flag("desired").Value.String()
+		fault := cmd.Flag("fault").Value.String()
+		timeout := cmd.Flag("timeout").Value.String()
+		lineend := cmd.Flag("lineend").Value.String()
+		verbose := cmd.Flag("verbose").Value.String()
+
+		// convert parameters to suitable format with library
+		baudInt, _ := strconv.Atoi(baud)
+		timeoutInt, _ := strconv.Atoi(timeout)
+		lineendBool, _ := strconv.ParseBool(lineend)
+
+		desiredSlice := []string{}
+		faultSlice := []string{}
+
+		if desired != "" {
+			words := strings.Split(desired, "/")
+			desiredSlice = append(desiredSlice, words...)
+		} else {
+			desiredSlice = nil
+		}
+
+		if fault != "" {
+			words := strings.Split(fault, "/")
+			faultSlice = append(faultSlice, words...)
+		} else {
+			faultSlice = nil
+		}
+
+		at := atcom.NewAtcom(nil, nil)
+
+		if port == "" {
+			detected, err := at.DecidePort()
+
+			if err != nil {
+				fmt.Println(err)
+				os.Exit(1)
+			}
+
+			port = detected["port"]
+		}
+
+		// If verbose mode is enabled, print parameters and responses until timeout,
+		// desired response, or a standard "OK"/"ERROR" is received
+		if verbose == "true" {
 
 			fmt.Println("--------------------------------------")
 			fmt.Println("Parameters")
@@ -240,11 +290,18 @@ func init() {
 	rootCmd.Flags().IntP("timeout", "t", 5, "timeout duration in seconds")
 	rootCmd.Flags().BoolP("lineend", "l", true, "line end")
 	rootCmd.Flags().BoolP("verbose", "v", false, "verbose mode")
-	rootCmd.Flags().BoolP("urc", "u", false, "unsolicited response code - if this flag is set, command will not be sent to modem")
 	rootCmd.Flags().StringP("version", "V", "", "version")
 
 	rootCmd.AddCommand(versionCmd)
 	rootCmd.AddCommand(detectCmd)
+	rootCmd.AddCommand(urcCmd)
+
+	urcCmd.Flags().StringP("port", "p", "", "port name")
+	urcCmd.Flags().IntP("baud", "b", 115200, "baud rate")
+	urcCmd.Flags().StringP("desired", "d", "", "desired responses - separate your multiple words with /")
+	urcCmd.Flags().StringP("fault", "f", "", "fault responses - separate your multiple words with /")
+	urcCmd.Flags().IntP("timeout", "t", 5, "timeout duration in seconds")
+	urcCmd.Flags().BoolP("lineend", "l", true, "line end")
 
 	detectCmd.Flags().BoolP("all", "a", false, "all modem attributes")
 	detectCmd.Flags().BoolP("vid", "v", false, "vendor id")
