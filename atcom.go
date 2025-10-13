@@ -282,9 +282,7 @@ func (t *Atcom) SendAT(c *ATCommand) *ATCommand {
 		case <-timeoutCh:
 			cancelScan()
 			c.Response = data
-			if c.ResponseChan == nil {
-				c.Error = errors.New("timeout")
-			}
+			c.Error = errors.New("timeout")
 			return c
 		}
 	}
