@@ -97,7 +97,21 @@ func (t *Atcom) open(portname string, baudrate int) (port *serial.Port, err erro
 		ReadTimeout: time.Millisecond * 100,
 	}
 
-	return t.serial.OpenPort(config)
+	port, err = t.serial.OpenPort(config)
+	if err != nil {
+		return nil, err
+	}
+
+	// clear buffer
+	buf := make([]byte, 4096)
+	for {
+		n, _ := port.Read(buf)
+		if n == 0 {
+			break
+		}
+	}
+
+	return port, nil
 }
 
 // SendAT sends AT command to modem and returns response
