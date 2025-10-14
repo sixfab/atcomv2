@@ -97,7 +97,21 @@ func (t *Atcom) open(portname string, baudrate int) (port *serial.Port, err erro
 		ReadTimeout: time.Millisecond * 100,
 	}
 
-	return t.serial.OpenPort(config)
+	port, err = t.serial.OpenPort(config)
+	if err != nil {
+		return nil, err
+	}
+
+	// clear buffer
+	buf := make([]byte, 4096)
+	for {
+		n, _ := port.Read(buf)
+		if n == 0 {
+			break
+		}
+	}
+
+	return port, nil
 }
 
 // SendAT sends AT command to modem and returns response
@@ -165,107 +179,61 @@ func (t *Atcom) SendAT(c *ATCommand) *ATCommand {
 					return
 				}
 
-				// Send real-time responses through the channel if ResponseChan is set
-				// Listen for responses until a timeout occurs or the desired response is received.
-				if responseChan != nil {
-					if n > 0 {
-						response = string(buf[:n])
-					}
-
-					lines := strings.Split(response, "\r\n")
-
-					for _, line := range lines {
-						line = strings.TrimSpace(line)
-						line = strings.Trim(line, "\r")
-						line = strings.Trim(line, "\n")
-
-						if line != "" {
-							data = append(data, line)
-							c.ResponseChan <- line
-						}
-
-						if strings.Contains(line, "ERROR") {
-							found <- errors.New(line)
-							break
-						}
-
-						if strings.Contains(line, "OK") {
-							found <- nil
-							break
-						}
-
-						// check desired and fault existed in response
-						if desired != nil || fault != nil {
-							for _, desiredStr := range desired {
-								if strings.Contains(line, desiredStr) {
-									found <- nil
-									return
-								}
-							}
-							for _, faultStr := range fault {
-								if strings.Contains(line, faultStr) {
-									found <- errors.New("faulty response detected")
-									return
-								}
-							}
-
-						}
-					}
+				// if no data, continue
+				if n == 0 {
 					continue
 				}
 
-				if n > 0 {
-					response += string(buf[:n])
-				}
+				response = string(buf[:n])
+				lines := strings.Split(response, "\r\n")
 
-				if strings.Contains(response, "\r\nOK\r\n") {
-					lines := strings.Split(response, "\r\n")
+				for _, line := range lines {
+					line = strings.TrimSpace(line)
+					line = strings.Trim(line, "\r")
+					line = strings.Trim(line, "\n")
 
-					for _, line := range lines {
-						line = strings.TrimSpace(line)
-						line = strings.Trim(line, "\r")
-						line = strings.Trim(line, "\n")
+					if line == "" {
+						continue
+					}
 
-						if line != "" {
-							data = append(data, line)
-						}
+					// send line to response channel if exists
+					if responseChan != nil {
+						c.ResponseChan <- line
+					} else {
+						data = append(data, line)
+					}
 
-						if line == "OK" {
-							break
-						}
+					// check "ERROR" existed in response
+					if strings.Contains(line, "ERROR") {
+						time.Sleep(time.Millisecond * 5)
+						found <- errors.New(line)
+						break
+					}
+
+					// check "OK" existed in response
+					if strings.Contains(line, "OK") {
+						time.Sleep(time.Millisecond * 5)
+						found <- nil
+						break
 					}
 
 					// check desired and fault existed in response
 					if desired != nil || fault != nil {
-						ok := false
 						for _, desiredStr := range desired {
-							if strings.Contains(response, desiredStr) {
-								ok = true
-								found <- nil
+							if strings.Contains(line, desiredStr) {
+								time.Sleep(time.Millisecond * 5)
+								found <- nil  
 								return
 							}
 						}
 						for _, faultStr := range fault {
-							if strings.Contains(response, faultStr) {
+							if strings.Contains(line, faultStr) {
+								time.Sleep(time.Millisecond * 5)
 								found <- errors.New("faulty response detected")
 								return
 							}
 						}
-
-						if !ok {
-							found <- errors.New("desired response not found")
-							return
-						}
-					} else {
-						found <- nil
-						return
 					}
-
-					found <- nil
-					return
-				} else if strings.Contains(response, "\r\nERROR\r\n") {
-					found <- errors.New("modem error")
-					return
 				}
 			}
 		}
@@ -282,9 +250,7 @@ func (t *Atcom) SendAT(c *ATCommand) *ATCommand {
 		case <-timeoutCh:
 			cancelScan()
 			c.Response = data
-			if c.ResponseChan == nil {
-				c.Error = errors.New("timeout")
-			}
+			c.Error = errors.New("timeout")
 			return c
 		}
 	}
