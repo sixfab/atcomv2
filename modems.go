@@ -39,9 +39,9 @@ var supportedModems = []SupportedModem{
 	{"1bc7", "1035", "Telit", "LE910Cx ThreadX ECM", "if00"},
 	{"1bc7", "1036", "Telit", "LE910Cx ThreadX OPTION ONLY", "if00"},
 	{"1bc7", "1037", "Telit", "LE910Cx ThreadX DIAG + Dual Modem + RMNET", "if02" },
-	{"1bc7", "1038", "Telit", "LE910Cx ThreadX Dual Modem + RMNET", "if00" },
+	{"1bc7", "1038", "Telit", "LE910Cx ThreadX Dual Modem + RMNET", "if02" },
 	{"1bc7", "103b", "Telit", "LE910Cx ThreadX DIAG + Dual Modem", "if02" },
-	{"1bc7", "103c", "Telit", "LE910Cx ThreadX Dual Modem Only", "if00" },
+	{"1bc7", "103c", "Telit", "LE910Cx ThreadX Dual Modem Only", "if02" },
 	// Telit ME910C1
 	{"1bc7", "1101", "Telit", "ME910C1", "if01"},
 	{"1bc7", "1102", "Telit", "ME910C1", "if01"},
