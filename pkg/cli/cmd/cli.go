@@ -147,7 +147,12 @@ var urcCmd = &cobra.Command{
 		com.ResponseChan = responseChan
 		com.Urc = true
 
-		_ = at.SendAT(com)
+		com = at.SendAT(com)
+
+		if com.Error != nil {
+			fmt.Println(com.Error)
+			os.Exit(1)
+		}
 	},
 }
 

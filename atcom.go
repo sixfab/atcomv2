@@ -151,6 +151,7 @@ func (t *Atcom) SendAT(c *ATCommand) *ATCommand {
 	}
 
 	data := make([]string, 0)
+	responseBuffer := ""
 	timeoutDuration := time.Duration(timeout) * time.Second
 
 	found := make(chan error)
@@ -168,7 +169,7 @@ func (t *Atcom) SendAT(c *ATCommand) *ATCommand {
 				close(found)
 				return
 			default:
-				time.Sleep(time.Millisecond * 5)
+				time.Sleep(time.Millisecond * 10)
 				n, err := t.serial.Read(serialPort, buf)
 				if err != nil {
 					if err.Error() == "EOF" {
@@ -186,6 +187,7 @@ func (t *Atcom) SendAT(c *ATCommand) *ATCommand {
 
 				response = string(buf[:n])
 				lines := strings.Split(response, "\r\n")
+				responseBuffer += response
 
 				for _, line := range lines {
 					line = strings.TrimSpace(line)
@@ -196,44 +198,52 @@ func (t *Atcom) SendAT(c *ATCommand) *ATCommand {
 						continue
 					}
 
+					data = append(data, line)
+
 					// send line to response channel if exists
 					if responseChan != nil {
 						c.ResponseChan <- line
 					} else {
-						data = append(data, line)
-					}
-
-					// check "ERROR" existed in response
-					if strings.Contains(line, "ERROR") {
-						time.Sleep(time.Millisecond * 5)
-						found <- errors.New(line)
-						break
-					}
-
-					// check "OK" existed in response
-					if strings.Contains(line, "OK") {
-						time.Sleep(time.Millisecond * 5)
-						found <- nil
-						break
-					}
-
-					// check desired and fault existed in response
-					if desired != nil || fault != nil {
-						for _, desiredStr := range desired {
-							if strings.Contains(line, desiredStr) {
-								time.Sleep(time.Millisecond * 5)
-								found <- nil  
-								return
-							}
-						}
-						for _, faultStr := range fault {
-							if strings.Contains(line, faultStr) {
-								time.Sleep(time.Millisecond * 5)
-								found <- errors.New("faulty response detected")
-								return
-							}
+						if line == "OK" {
+							break
 						}
 					}
+				}
+
+				// check "ERROR" existed in response
+				if strings.Contains(responseBuffer, "ERROR") {
+					time.Sleep(time.Millisecond * 5)
+					found <- errors.New(responseBuffer)
+					break
+				}
+
+				// check desired and fault existed in response
+				if desired != nil || fault != nil {
+					ok := false
+					for _, desiredStr := range desired {
+						if strings.Contains(responseBuffer, desiredStr) {
+							time.Sleep(time.Millisecond * 5)
+							ok = true
+							found <- nil
+							return
+						}
+					}
+					for _, faultStr := range fault {
+						if strings.Contains(responseBuffer, faultStr) {
+							time.Sleep(time.Millisecond * 5)
+							ok = true
+							found <- errors.New("faulty response detected")
+							return
+						}
+					}
+
+					if !ok && responseChan == nil {
+						found <- errors.New("desired or fault response not found")
+						return
+					}
+				} else if responseChan == nil {
+					found <- nil
+					return
 				}
 			}
 		}
