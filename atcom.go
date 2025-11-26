@@ -169,7 +169,7 @@ func (t *Atcom) SendAT(c *ATCommand) *ATCommand {
 				close(found)
 				return
 			default:
-				time.Sleep(time.Millisecond * 5)
+				time.Sleep(time.Millisecond * 10)
 				n, err := t.serial.Read(serialPort, buf)
 				if err != nil {
 					if err.Error() == "EOF" {
@@ -187,6 +187,7 @@ func (t *Atcom) SendAT(c *ATCommand) *ATCommand {
 
 				response = string(buf[:n])
 				lines := strings.Split(response, "\r\n")
+				responseBuffer += response
 
 				for _, line := range lines {
 					line = strings.TrimSpace(line)
@@ -197,7 +198,6 @@ func (t *Atcom) SendAT(c *ATCommand) *ATCommand {
 						continue
 					}
 
-					responseBuffer += response
 					data = append(data, line)
 
 					// send line to response channel if exists
@@ -231,13 +231,14 @@ func (t *Atcom) SendAT(c *ATCommand) *ATCommand {
 					for _, faultStr := range fault {
 						if strings.Contains(responseBuffer, faultStr) {
 							time.Sleep(time.Millisecond * 5)
+							ok = true
 							found <- errors.New("faulty response detected")
 							return
 						}
 					}
 
 					if !ok && responseChan == nil {
-						found <- errors.New("desired response not found")
+						found <- errors.New("desired or fault response not found")
 						return
 					}
 				} else if responseChan == nil {
