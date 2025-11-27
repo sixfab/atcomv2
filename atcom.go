@@ -97,21 +97,7 @@ func (t *Atcom) open(portname string, baudrate int) (port *serial.Port, err erro
 		ReadTimeout: time.Millisecond * 100,
 	}
 
-	port, err = t.serial.OpenPort(config)
-	if err != nil {
-		return nil, err
-	}
-
-	// clear buffer
-	buf := make([]byte, 4096)
-	for {
-		n, _ := port.Read(buf)
-		if n == 0 {
-			break
-		}
-	}
-
-	return port, nil
+	return t.serial.OpenPort(config)
 }
 
 // SendAT sends AT command to modem and returns response
@@ -162,6 +148,8 @@ func (t *Atcom) SendAT(c *ATCommand) *ATCommand {
 	go func(ctx context.Context) {
 		response := ""
 		buf := make([]byte, 1024)
+		leftFromLastRead := make([]byte, 1024)
+		nLeftBytes := 0
 
 		for {
 			select {
@@ -169,7 +157,6 @@ func (t *Atcom) SendAT(c *ATCommand) *ATCommand {
 				close(found)
 				return
 			default:
-				time.Sleep(time.Millisecond * 10)
 				n, err := t.serial.Read(serialPort, buf)
 				if err != nil {
 					if err.Error() == "EOF" {
@@ -185,16 +172,39 @@ func (t *Atcom) SendAT(c *ATCommand) *ATCommand {
 					continue
 				}
 
-				response = string(buf[:n])
-				lines := strings.Split(response, "\r\n")
+				response = string(leftFromLastRead[:nLeftBytes]) + string(buf[:n]) // prepend left bytes from last read
+				nLeftBytes = 0                                                     // reset left bytes count
+
+				// replace \r with \n for uniformity
+				response = strings.ReplaceAll(response, "\r", "\n")
+				lines := strings.Split(response, "\n")
 				responseBuffer += response
 
-				for _, line := range lines {
+				if len(lines) == 1 && n > 0 {
+					// save all bytes to leftFromLastRead
+					copy(leftFromLastRead, []byte(response))
+					nLeftBytes = n
+					continue
+				}
+
+				// split response to lines and trim spaces
+				for index, line := range lines {
 					line = strings.TrimSpace(line)
-					line = strings.Trim(line, "\r")
-					line = strings.Trim(line, "\n")
 
 					if line == "" {
+						if index == len(lines)-1 {
+							// save left bytes for next read
+							copy(leftFromLastRead, []byte(line))
+							nLeftBytes = len(line)
+
+							if nLeftBytes > 0 {
+								// remove last index of data
+								if len(data) > 0 {
+									data = data[:len(data)-1]
+								}
+							}
+							break
+						}
 						continue
 					}
 
@@ -203,46 +213,61 @@ func (t *Atcom) SendAT(c *ATCommand) *ATCommand {
 					// send line to response channel if exists
 					if responseChan != nil {
 						c.ResponseChan <- line
-					} else {
+					}
+				}
+
+				if responseChan == nil { // if responseChan is not existed
+					for _, line := range data {
 						if line == "OK" {
-							break
+							// check desired and fault existed in response
+							if desired != nil || fault != nil {
+								ok := false
+								for _, desiredStr := range desired {
+									if strings.Contains(responseBuffer, desiredStr) {
+										ok = true
+										found <- nil
+										return
+									}
+								}
+								for _, faultStr := range fault {
+									if strings.Contains(responseBuffer, faultStr) {
+										ok = true
+										found <- errors.New("faulty response detected")
+										return
+									}
+								}
+
+								if !ok {
+									found <- errors.New("desired or fault response not found")
+									return
+								}
+							} else {
+								found <- nil
+								return
+							}
+						}
+					}
+				} else { // if responseChan is existed
+					// check desired and fault existed in response
+					if desired != nil || fault != nil {
+						for _, desiredStr := range desired {
+							if strings.Contains(responseBuffer, desiredStr) {
+								found <- nil
+								return
+							}
+						}
+						for _, faultStr := range fault {
+							if strings.Contains(responseBuffer, faultStr) {
+								found <- errors.New("faulty response detected")
+								return
+							}
 						}
 					}
 				}
 
 				// check "ERROR" existed in response
 				if strings.Contains(responseBuffer, "ERROR") {
-					time.Sleep(time.Millisecond * 5)
 					found <- errors.New(responseBuffer)
-					break
-				}
-
-				// check desired and fault existed in response
-				if desired != nil || fault != nil {
-					ok := false
-					for _, desiredStr := range desired {
-						if strings.Contains(responseBuffer, desiredStr) {
-							time.Sleep(time.Millisecond * 5)
-							ok = true
-							found <- nil
-							return
-						}
-					}
-					for _, faultStr := range fault {
-						if strings.Contains(responseBuffer, faultStr) {
-							time.Sleep(time.Millisecond * 5)
-							ok = true
-							found <- errors.New("faulty response detected")
-							return
-						}
-					}
-
-					if !ok && responseChan == nil {
-						found <- errors.New("desired or fault response not found")
-						return
-					}
-				} else if responseChan == nil {
-					found <- nil
 					return
 				}
 			}
