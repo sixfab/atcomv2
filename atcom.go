@@ -29,6 +29,7 @@ type SerialModel interface {
 	Write(port *serial.Port, command []byte) (n int, err error)
 	Close(port *serial.Port) (err error)
 	Read(port *serial.Port, buffer []byte) (n int, err error)
+	Flush(port *serial.Port) error
 }
 
 // Serial implements Serial interface
@@ -46,6 +47,10 @@ func (s *Serial) Close(port *serial.Port) (err error) {
 
 func (s *Serial) Read(port *serial.Port, buffer []byte) (n int, err error) {
 	return port.Read(buffer)
+}
+
+func (s *Serial) Flush(port *serial.Port) error {
+	return port.Flush()
 }
 
 // Shell Implementation for normal usage
@@ -128,6 +133,10 @@ func (t *Atcom) SendAT(c *ATCommand) *ATCommand {
 
 	// If urc is true, do not send command to serial port.
 	if !urc {
+		// drain serial buffer before sending command
+		t.serial.Flush(serialPort)
+
+		// send command to serial port
 		_, err = t.serial.Write(serialPort, []byte(command))
 	}
 
@@ -191,21 +200,17 @@ func (t *Atcom) SendAT(c *ATCommand) *ATCommand {
 				for index, line := range lines {
 					line = strings.TrimSpace(line)
 
+					// skip empty lines
 					if line == "" {
-						if index == len(lines)-1 {
-							// save left bytes for next read
-							copy(leftFromLastRead, []byte(line))
-							nLeftBytes = len(line)
-
-							if nLeftBytes > 0 {
-								// remove last index of data
-								if len(data) > 0 {
-									data = data[:len(data)-1]
-								}
-							}
-							break
-						}
 						continue
+					}
+
+					// if last line and not ended with \n, save it for next read
+					if index == len(lines)-1 {
+						// save left bytes for next read
+						copy(leftFromLastRead, []byte(line))
+						nLeftBytes = len(line)
+						break
 					}
 
 					data = append(data, line)
