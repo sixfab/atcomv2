@@ -272,7 +272,10 @@ func (t *Atcom) SendAT(c *ATCommand) *ATCommand {
 
 				// check "ERROR" existed in response
 				if strings.Contains(responseBuffer, "ERROR") {
-					found <- errors.New(responseBuffer)
+					// remove \n from responseBuffer for cleaner error message
+					responseBuffer = strings.ReplaceAll(responseBuffer, "\n", "")
+
+					found <- errors.New("modem error - " + responseBuffer)
 					return
 				}
 			}
